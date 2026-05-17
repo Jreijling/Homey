@@ -144,24 +144,25 @@
 </div>
 
 <script>
-  // Homey settings API bridge
-  function onHomeyReady(Homey) {
-    Homey.ready();
-
+  async function onHomeyReady(Homey) {
     const $ = id => document.getElementById(id);
 
-    // Load saved settings
-    Homey.get('email',         v => { $('email').value         = v || ''; });
-    Homey.get('country',       v => { $('country').value       = (v || 'NL').toUpperCase(); });
-    Homey.get('poll_interval', v => { $('poll_interval').value = v || 60; });
-    // Do NOT pre-fill password for security
-
-    function showStatus(el, msg, isError) {
-      el.textContent  = msg;
-      el.className    = 'status ' + (isError ? 'error' : 'success');
+    // Load saved settings, then show the page
+    try {
+      $('email').value         = (await Homey.get('email'))         || '';
+      $('country').value       = ((await Homey.get('country'))      || 'NL').toUpperCase();
+      $('poll_interval').value = (await Homey.get('poll_interval')) || 60;
+      // Do NOT pre-fill password for security
+    } finally {
+      Homey.ready();
     }
 
-    $('saveBtn').addEventListener('click', () => {
+    function showStatus(el, msg, isError) {
+      el.textContent = msg;
+      el.className   = 'status ' + (isError ? 'error' : 'success');
+    }
+
+    $('saveBtn').addEventListener('click', async () => {
       const email    = $('email').value.trim();
       const password = $('password').value;
       const country  = $('country').value.trim().toUpperCase() || 'NL';
@@ -172,21 +173,27 @@
         return;
       }
 
-      Homey.set('email',    email,   err => { if (err) showStatus(statusEl, err, true); });
-      Homey.set('password', password);
-      Homey.set('country',  country);
-
-      showStatus(statusEl, '✓ Credentials saved. The app will reconnect shortly.', false);
+      try {
+        await Homey.set('email',    email);
+        await Homey.set('password', password);
+        await Homey.set('country',  country);
+        showStatus(statusEl, '✓ Credentials saved. The app will reconnect shortly.', false);
+      } catch (err) {
+        showStatus(statusEl, String(err), true);
+      }
     });
 
-    $('savePollBtn').addEventListener('click', () => {
+    $('savePollBtn').addEventListener('click', async () => {
       const interval  = Math.max(30, parseInt($('poll_interval').value) || 60);
       const statusEl  = $('pollStatus');
       $('poll_interval').value = interval;
-      Homey.set('poll_interval', interval, err => {
-        if (err) showStatus(statusEl, String(err), true);
-        else     showStatus(statusEl, '✓ Poll interval saved.', false);
-      });
+
+      try {
+        await Homey.set('poll_interval', interval);
+        showStatus(statusEl, '✓ Poll interval saved.', false);
+      } catch (err) {
+        showStatus(statusEl, String(err), true);
+      }
     });
   }
 </script>
