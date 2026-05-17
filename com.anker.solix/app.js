@@ -24,7 +24,11 @@ class AnkerSolixApp extends Homey.App {
     });
 
     // Register flow card handlers
-    this._registerFlowCards();
+    try {
+      this._registerFlowCards();
+    } catch (err) {
+      this.error('Flow card registration failed:', err.message);
+    }
 
     // Boot
     await this._initApi();
@@ -150,31 +154,31 @@ class AnkerSolixApp extends Homey.App {
   // ─── Flow cards ───────────────────────────────────────────────────────────
 
   _registerFlowCards() {
-    // Conditions
-    this.homey.flow.getConditionCard('battery_soc_above')
+    // Conditions (device cards — have a "device" argument)
+    this.homey.flow.getDeviceConditionCard('battery_soc_above')
       .registerRunListener(({ device, soc }) => {
         const current = device.getCapabilityValue('measure_battery') ?? 0;
         return current > soc;
       });
 
-    this.homey.flow.getConditionCard('solar_power_above')
+    this.homey.flow.getDeviceConditionCard('solar_power_above')
       .registerRunListener(({ device, watts }) => {
         const current = device.getCapabilityValue('solar_power') ?? 0;
         return current > watts;
       });
 
-    this.homey.flow.getConditionCard('grid_importing')
+    this.homey.flow.getDeviceConditionCard('grid_importing')
       .registerRunListener(({ device }) => {
         return (device.getCapabilityValue('grid_import_power') ?? 0) > 0;
       });
 
-    // Actions
-    this.homey.flow.getActionCard('set_output_preset')
+    // Actions (device cards — have a "device" argument)
+    this.homey.flow.getDeviceActionCard('set_output_preset')
       .registerRunListener(async ({ device, watts }) => {
         await device.setOutputPreset(watts);
       });
 
-    this.homey.flow.getActionCard('set_grid_export')
+    this.homey.flow.getDeviceActionCard('set_grid_export')
       .registerRunListener(async ({ device, enabled }) => {
         await device.setGridExport(enabled === 'true');
       });
