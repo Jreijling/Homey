@@ -1,0 +1,64 @@
+{
+  "app": {
+    "name": "Anker Solix",
+    "description": "Bewaak en beheer uw Anker Solix zonne-energiesysteem"
+  },
+  "errors": {
+    "no_credentials":  "Stel eerst uw Anker-accountgegevens in via de app-instellingen.",
+    "login_failed":    "Aanmelding mislukt. Controleer uw e-mailadres, wachtwoord en landcode.",
+    "no_solarbanks":   "Geen Solarbank-apparaten gevonden. Zorg dat uw apparaten zijn toegevoegd aan een Power System in de Anker-app.",
+    "no_smart_meters": "Geen slimme meters gevonden in uw Anker-systeem.",
+    "no_sites":        "Geen energiesystemen gevonden in uw Anker-account."
+  },
+  "pair": {
+    "step1_title": "Voer uw Anker-accountgegevens in",
+    "step2_title": "Voer uw landcode in",
+    "step2_hint":  "Gebruik de 2-letterige ISO-landcode (NL, DE, US, AU, …)",
+    "success":     "Succesvol verbonden!",
+    "pick_device": "Selecteer een apparaat om toe te voegen"
+  },
+  "drivers": {
+    "solarbank": {
+      "name": "Solarbank",
+      "pair": { "list_devices": { "title": "Selecteer een Solarbank" } }
+    },
+    "smart-meter": {
+      "name": "Slimme meter",
+      "pair": { "list_devices": { "title": "Selecteer een slimme meter" } }
+    },
+    "system": {
+      "name": "Energiesysteem",
+      "pair": { "list_devices": { "title": "Selecteer een energiesysteem" } }
+    }
+  },
+  "capabilities": {
+    "solar_power":             { "title": "Zonnestroom"           },
+    "battery_charge_power":    { "title": "Batterij oplaadvermogen" },
+    "battery_discharge_power": { "title": "Batterij ontlaadvermogen" },
+    "ac_output_power":         { "title": "AC uitgangsvermogen"   },
+    "output_preset_power":     { "title": "Uitgangsvermogen doel" },
+    "battery_min_soc":         { "title": "Min. batterijlading"   },
+    "grid_export_enabled":     { "title": "Netexport"             },
+    "home_load_power":         { "title": "Thuisverbruik"         },
+    "grid_import_power":       { "title": "Nettimportvermogen"    },
+    "grid_export_power":       { "title": "Netexportvermogen"     }
+  },
+  "flow": {
+    "triggers": {
+      "solarbank_charging_started":    "Batterij is begonnen met opladen",
+      "solarbank_charging_stopped":    "Batterij is gestopt met opladen",
+      "solarbank_discharging_started": "Batterij is begonnen met ontladen",
+      "grid_import_started":           "Nettimport gestart",
+      "grid_export_started":           "Netexport gestart"
+    },
+    "conditions": {
+      "battery_soc_above": "Batterijlading is boven {soc}%",
+      "solar_power_above": "Zonnestroom is boven {watts}W",
+      "grid_importing":    "Net importeert stroom"
+    },
+    "actions": {
+      "set_output_preset": "Stel uitgangsvermogen in op {watts}W",
+      "set_grid_export":   "Stel netexport in op {enabled}"
+    }
+  }
+}

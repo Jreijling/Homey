@@ -1,0 +1,76 @@
+{
+  "app": {
+    "name": "Anker Solix",
+    "description": "Monitor and control your Anker Solix solar energy system"
+  },
+  "errors": {
+    "no_credentials": "Please configure your Anker account credentials in the app settings first.",
+    "login_failed":   "Login failed. Check your email, password and country code.",
+    "no_solarbanks":  "No Solarbank devices found. Make sure your devices are added to a Power System in the Anker app.",
+    "no_smart_meters": "No Smart Meters found in your Anker system.",
+    "no_sites":       "No power systems (sites) found in your Anker account."
+  },
+  "pair": {
+    "step1_title":    "Enter your Anker account credentials",
+    "step2_title":    "Enter your country code",
+    "step2_hint":     "Use the 2-letter ISO country code (NL, DE, US, AU, …)",
+    "success":        "Connected successfully!",
+    "pick_device":    "Select a device to add"
+  },
+  "drivers": {
+    "solarbank": {
+      "name": "Solarbank",
+      "pair": {
+        "list_devices": {
+          "title": "Select a Solarbank"
+        }
+      }
+    },
+    "smart-meter": {
+      "name": "Smart Meter",
+      "pair": {
+        "list_devices": {
+          "title": "Select a Smart Meter"
+        }
+      }
+    },
+    "system": {
+      "name": "Power System",
+      "pair": {
+        "list_devices": {
+          "title": "Select a Power System"
+        }
+      }
+    }
+  },
+  "capabilities": {
+    "solar_power":            { "title": "Solar Power"           },
+    "battery_charge_power":   { "title": "Battery Charge Power"  },
+    "battery_discharge_power":{ "title": "Battery Discharge Power"},
+    "ac_output_power":        { "title": "AC Output Power"       },
+    "output_preset_power":    { "title": "Output Power Target"   },
+    "battery_min_soc":        { "title": "Min Battery SOC"       },
+    "grid_export_enabled":    { "title": "Grid Export"           },
+    "home_load_power":        { "title": "Home Load"             },
+    "grid_import_power":      { "title": "Grid Import Power"     },
+    "grid_export_power":      { "title": "Grid Export Power"     }
+  },
+  "flow": {
+    "triggers": {
+      "solarbank_charging_started":   "Battery started charging",
+      "solarbank_charging_stopped":   "Battery stopped charging",
+      "solarbank_discharging_started":"Battery started discharging",
+      "grid_import_started":          "Grid import started",
+      "grid_export_started":          "Grid export started"
+    },
+    "conditions": {
+      "battery_soc_above": "Battery SOC is above {soc}%",
+      "solar_power_above": "Solar power is above {watts}W",
+      "grid_importing":    "Grid is importing power"
+    },
+    "actions": {
+      "set_output_preset": "Set output power target to {watts}W",
+      "set_grid_export":   "Set grid export to {enabled}"
+    }
+  }
+}
