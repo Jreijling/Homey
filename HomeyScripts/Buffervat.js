@@ -347,26 +347,23 @@ redenen.push(zonnebufferReden);
 
 // Prioriteit:
 // 1. vakantie -> VAKANTIE (minimum, geen zonne-boost)
-// 2. zonne-overschot -> BOOST
-// 3. duurste 8 uren -> ECO
+// 2. duurste 8 uren -> ECO (zonne-overschot NIET gebruikt: stroom verkopen loont meer)
+// 3. zonne-overschot (tijdens niet-dure uren) -> BOOST
 // 4. goedkoopste 10 uren -> BOOST
 // 5. anders -> NORMAAL
 if (opVakantie) {
   modus = 'VAKANTIE';
   doeltemp = VAKANTIE_TEMPERATUUR;
   redenen.push('Vakantie: buffervat op minimum temperatuur (zonne-overschot genegeerd)');
-} else if (zonneBoostActief) {
-  modus = 'BOOST_ZONNE';
-  doeltemp = BOOST_TEMPERATUUR_ZONNE;
-  redenen.push('Buffervat verwarmen op zonne-overschot');
-  if (isDuurUur) {
-    redenen.push('Zonne-overschot override op duur uur');
-  }
 } else if (isDuurUur) {
   modus = 'ECO_DUUR';
   doeltemp = ECO_TEMPERATUUR;
-  redenen.push('Buffervat naar ECO omdat huidig uur in de ' + DUURSTE_UREN_AANTAL + ' duurste uren valt');
-} else if (isGoedkoopUur && solarForecast < SOLAR_FORECAST_SKIP_BOOST_KWH) {
+  redenen.push('Buffervat naar ECO: duurste ' + DUURSTE_UREN_AANTAL + ' uren — zonne-overschot niet gebruikt, stroom terugleveren loont meer');
+} else if (zonneBoostActief) {
+  modus = 'BOOST_ZONNE';
+  doeltemp = BOOST_TEMPERATUUR_ZONNE;
+  redenen.push('Buffervat verwarmen op zonne-overschot (prijzen niet hoog)');
+} else if (isGoedkoopUur) {
   modus = 'BOOST_GOEDKOOP';
   doeltemp = BOOST_TEMPERATUUR_STANDAARD;
   redenen.push('Buffervat verwarmen omdat huidig uur in de ' + GOEDKOOPSTE_UREN_AANTAL + ' goedkoopste uren valt (solar forecast: ' + solarForecast + ' kWh)');
