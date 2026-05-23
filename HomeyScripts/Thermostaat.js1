@@ -1,0 +1,465 @@
+// ==========================
+// Thermostaat - Presence + Prijs + Zon
+// Presence via Homey users API
+// Prijs via Power by the Hour DAP device
+// ==========================
+
+// ---------- Device IDs ----------
+const THERMOSTAT_ID = '295b3cbb-2cc4-4e4d-9996-294cdf6b2cd0';
+const P1_ID = '3755a652-027b-41bb-b188-ab2ac592ee04';
+const DAP_DEVICE_ID = '48b55814-c41c-4b0b-a65a-b7c5a21182e0'; // NL_Netherlands
+
+// ---------- Setpoints (vloerverwarming) ----------
+const AWAY_SETPOINT = 19.0;
+const HOME_ECO_SETPOINT = 19.0;
+const HOME_NORMAL_SETPOINT = 19.5;
+const HOME_BOOST_SETPOINT = 20.0;
+
+// ---------- Zonne thresholds met buffer ----------
+const GRID_SOLAR_BOOST_ON_WATT = -2000;   // boost AAN bij flink export
+const GRID_SOLAR_BOOST_OFF_WATT = -800;   // boost UIT als overschot grotendeels weg is
+
+// ---------- Prijs instellingen ----------
+const CHEAPEST_HOURS_COUNT = 10;
+const EXPENSIVE_HOURS_COUNT = 8;
+
+// ---------- Logging ----------
+const LOG_MAX_LINES = 40;
+const SEND_TIMELINE_ON_CHANGE = true;
+
+const LOG_VARIABLE = 'thermostaat_log';
+const LAST_REASON_VARIABLE = 'thermostaat_laatste_reden';
+const LAST_MODE_VARIABLE = 'thermostaat_laatste_modus';
+const LAST_TARGET_VARIABLE = 'thermostaat_laatste_doeltemp';
+const LAST_RUN_VARIABLE = 'thermostaat_laatste_resultaat';
+const SOLAR_BOOST_ACTIVE_VARIABLE = 'thermostaat_solarboost_active';
+
+// --------------------------
+// Helpers
+// --------------------------
+function nowLocal() {
+  const d = new Date();
+  const pad = function(n) {
+    return String(n).padStart(2, '0');
+  };
+
+  return d.getFullYear() + '-' +
+    pad(d.getMonth() + 1) + '-' +
+    pad(d.getDate()) + ' ' +
+    pad(d.getHours()) + ':' +
+    pad(d.getMinutes()) + ':' +
+    pad(d.getSeconds());
+}
+
+function round(value, decimals) {
+  if (decimals === undefined) decimals = 3;
+  return Number(Number(value).toFixed(decimals));
+}
+
+async function getAllLogicVars() {
+  return await Homey.logic.getVariables();
+}
+
+async function findLogicVarByName(name) {
+  const vars = await getAllLogicVars();
+  const allVars = Object.values(vars);
+
+  for (let i = 0; i < allVars.length; i++) {
+    if (allVars[i].name === name) {
+      return allVars[i];
+    }
+  }
+
+  return null;
+}
+
+async function getVar(name, fallback) {
+  try {
+    const found = await findLogicVarByName(name);
+    if (!found) return fallback;
+
+    const value = found.value;
+
+    if (typeof fallback === 'number') {
+      const num = Number(value);
+      return Number.isFinite(num) ? num : fallback;
+    }
+
+    if (typeof fallback === 'boolean') {
+      if (typeof value === 'boolean') return value;
+      if (value === 'true' || value === 1 || value === '1') return true;
+      if (value === 'false' || value === 0 || value === '0') return false;
+      return fallback;
+    }
+
+    return value != null ? value : fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+
+async function ensureLogicVar(name, type, initialValue) {
+  const existing = await findLogicVarByName(name);
+  if (existing) return existing;
+
+  return await Homey.logic.createVariable({
+    variable: {
+      name: name,
+      type: type,
+      value: initialValue
+    }
+  });
+}
+
+async function setLogicVar(name, type, value) {
+  const variable = await ensureLogicVar(name, type, value);
+
+  await Homey.logic.updateVariable({
+    id: variable.id,
+    variable: { value: value }
+  });
+
+  return variable;
+}
+
+async function appendLogLine(line) {
+  const current = await getVar(LOG_VARIABLE, '');
+  const lines = String(current || '')
+    .split('\n')
+    .filter(function(x) { return Boolean(x); });
+
+  lines.push(line);
+
+  while (lines.length > LOG_MAX_LINES) {
+    lines.shift();
+  }
+
+  await setLogicVar(LOG_VARIABLE, 'string', lines.join('\n'));
+}
+
+async function addTimeline(text) {
+  try {
+    await Homey.flow.runFlowCardAction({
+      uri: 'homey:flowcardaction:homey:manager:notifications:create_notification',
+      id: 'homey:manager:notifications:create_notification',
+      args: { text: text }
+    });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function computePriceBands(prices) {
+  const valid = prices
+    .map(function(x) { return Number(x); })
+    .filter(function(x) { return Number.isFinite(x); });
+
+  if (valid.length < 2) {
+    return null;
+  }
+
+  const sortedAsc = valid.slice().sort(function(a, b) { return a - b; });
+  const sortedDesc = valid.slice().sort(function(a, b) { return b - a; });
+
+  const cheapCount = Math.min(CHEAPEST_HOURS_COUNT, sortedAsc.length);
+  const expensiveCount = Math.min(EXPENSIVE_HOURS_COUNT, sortedDesc.length);
+
+  const cheapSlice = sortedAsc.slice(0, cheapCount);
+  const expensiveSlice = sortedDesc.slice(0, expensiveCount);
+
+  return {
+    cheapThreshold: cheapSlice[cheapSlice.length - 1],
+    expensiveThreshold: expensiveSlice[expensiveSlice.length - 1],
+    cheapSlice: cheapSlice,
+    expensiveSlice: expensiveSlice,
+    count: valid.length
+  };
+}
+
+// --------------------------
+// Devices ophalen
+// --------------------------
+const thermostat = await Homey.devices.getDevice({ id: THERMOSTAT_ID });
+const p1 = await Homey.devices.getDevice({ id: P1_ID });
+const dap = await Homey.devices.getDevice({ id: DAP_DEVICE_ID });
+
+// --------------------------
+// Actuele waarden
+// --------------------------
+const currentTarget = Number(thermostat.capabilitiesObj.target_temperature.value);
+const grid = Number(p1.capabilitiesObj.measure_power.value);
+
+// ---------- Presence via users ----------
+let isHome = false;
+let presenceSource = 'users_api';
+let presentUsers = [];
+
+try {
+  const users = await Homey.users.getUsers();
+
+  presentUsers = Object.values(users)
+    .filter(function(u) {
+      return u.present === true && u.enabled !== false;
+    })
+    .map(function(u) {
+      return {
+        id: u.id,
+        name: u.name || 'unknown',
+        role: u.role || 'unknown'
+      };
+    });
+
+  isHome = presentUsers.length > 0;
+} catch (e) {
+  isHome = false;
+  presenceSource = 'users_api_error: ' + e.message;
+}
+
+// ---------- Prijzen via DAP ----------
+const dapCaps = dap.capabilitiesObj || {};
+
+if (!dapCaps.meter_price_h0 || dapCaps.meter_price_h0.value == null) {
+  throw new Error('DAP capability meter_price_h0 niet gevonden of leeg');
+}
+
+if (!dapCaps.meter_rank_price_h0_this_day || dapCaps.meter_rank_price_h0_this_day.value == null) {
+  throw new Error('DAP capability meter_rank_price_h0_this_day niet gevonden of leeg');
+}
+
+const priceNow = Number(dapCaps.meter_price_h0.value);
+const currentRankToday = Number(dapCaps.meter_rank_price_h0_this_day.value);
+
+if (!Number.isFinite(priceNow)) {
+  throw new Error('Ongeldige actuele prijs uit DAP device');
+}
+
+if (!Number.isFinite(currentRankToday)) {
+  throw new Error('Ongeldige prijsrang uit DAP device');
+}
+
+const pricesToday = [];
+for (let i = 0; i < 24; i++) {
+  const capName = 'meter_price_h' + i;
+  const cap = dapCaps[capName];
+
+  if (cap && cap.value != null) {
+    const price = Number(cap.value);
+    if (Number.isFinite(price)) {
+      pricesToday.push(price);
+    }
+  }
+}
+
+const priceBands = computePriceBands(pricesToday);
+const cheapThreshold = priceBands ? priceBands.cheapThreshold : null;
+const expensiveThreshold = priceBands ? priceBands.expensiveThreshold : null;
+
+// BELANGRIJK:
+// rank 1 = goedkoopste uur
+const isCheapHourByRank = currentRankToday <= CHEAPEST_HOURS_COUNT;
+const isExpensiveHourByRank = pricesToday.length >= EXPENSIVE_HOURS_COUNT
+  ? currentRankToday > (pricesToday.length - EXPENSIVE_HOURS_COUNT)
+  : false;
+
+const isCheapHourByThreshold = priceBands ? priceNow <= cheapThreshold : false;
+const isExpensiveHourByThreshold = priceBands ? priceNow >= expensiveThreshold : false;
+
+// Gebruik rank als primaire bron, thresholds als extra controle
+const isCheapHour = isCheapHourByRank || isCheapHourByThreshold;
+const isExpensiveHour = isExpensiveHourByRank || isExpensiveHourByThreshold;
+
+// ---------- Solar buffer / hysterese ----------
+const previousSolarBoostActive = await getVar(SOLAR_BOOST_ACTIVE_VARIABLE, false);
+let solarBoostActive = previousSolarBoostActive;
+let solarBufferReason = '';
+
+if (previousSolarBoostActive) {
+  if (grid > GRID_SOLAR_BOOST_OFF_WATT) {
+    solarBoostActive = false;
+    solarBufferReason = 'Solar boost UIT via buffer: grid ' + grid + 'W > ' + GRID_SOLAR_BOOST_OFF_WATT + 'W';
+  } else {
+    solarBoostActive = true;
+    solarBufferReason = 'Solar boost blijft AAN via buffer: grid ' + grid + 'W <= ' + GRID_SOLAR_BOOST_OFF_WATT + 'W';
+  }
+} else {
+  if (grid < GRID_SOLAR_BOOST_ON_WATT) {
+    solarBoostActive = true;
+    solarBufferReason = 'Solar boost AAN via buffer: grid ' + grid + 'W < ' + GRID_SOLAR_BOOST_ON_WATT + 'W';
+  } else {
+    solarBoostActive = false;
+    solarBufferReason = 'Solar boost blijft UIT via buffer: grid ' + grid + 'W >= ' + GRID_SOLAR_BOOST_ON_WATT + 'W';
+  }
+}
+
+// ---------- Vorige status ----------
+const previousMode = await getVar(LAST_MODE_VARIABLE, 'UNKNOWN');
+const previousTarget = await getVar(LAST_TARGET_VARIABLE, currentTarget);
+
+// --------------------------
+// Logica
+// --------------------------
+let mode = 'AWAY';
+let target = AWAY_SETPOINT;
+let reasons = [];
+
+reasons.push('Huidige prijs: ' + round(priceNow) + ' EUR/kWh');
+reasons.push('Prijsrang vandaag: #' + currentRankToday + ' (1 = goedkoopst)');
+reasons.push('Goedkoop via rank: ' + isCheapHourByRank);
+reasons.push('Duur via rank: ' + isExpensiveHourByRank);
+reasons.push(solarBufferReason);
+
+if (!isHome) {
+  mode = 'AWAY';
+  target = AWAY_SETPOINT;
+  reasons.push('Niemand thuis volgens Homey users presence');
+} else {
+  const presentNames = presentUsers.map(function(u) { return u.name; }).join(', ');
+  reasons.push('Aanwezig: ' + presentNames);
+
+  // Prioriteit:
+  // 1. Groot zonne-overschot met buffer -> 20.0
+  // 2. 8 duurste uren -> 19.0
+  // 3. Goedkoop uur -> 20.0
+  // 4. Normaal -> 19.5
+  if (solarBoostActive) {
+    mode = 'BOOST_SOLAR';
+    target = HOME_BOOST_SETPOINT;
+    reasons.push('Groot zonne-overschot actief via buffer');
+    if (isExpensiveHour) {
+      reasons.push('Zonne-overschot override op duur uur');
+    }
+  } else if (isExpensiveHour) {
+    mode = 'ECO_EXPENSIVE';
+    target = HOME_ECO_SETPOINT;
+    reasons.push('Huidig uur valt in de ' + EXPENSIVE_HOURS_COUNT + ' duurste uren');
+  } else if (isCheapHour) {
+    mode = 'BOOST_CHEAP';
+    target = HOME_BOOST_SETPOINT;
+    reasons.push('Huidig uur valt in de ' + CHEAPEST_HOURS_COUNT + ' goedkoopste uren');
+  } else {
+    mode = 'NORMAL';
+    target = HOME_NORMAL_SETPOINT;
+    reasons.push('Normale thuis-situatie');
+  }
+}
+
+// --------------------------
+// Hysterese target
+// --------------------------
+let hysteresisHeld = false;
+
+if (Math.abs(currentTarget - target) < 0.2) {
+  hysteresisHeld = true;
+  target = currentTarget;
+  reasons.push('Hysterese actief op target_temperature');
+}
+
+// --------------------------
+// Toepassen
+// --------------------------
+let changed = false;
+let action = 'none';
+
+if (target !== currentTarget) {
+  await thermostat.setCapabilityValue('target_temperature', target);
+  changed = true;
+  action = 'set target_temperature ' + currentTarget + ' -> ' + target;
+  reasons.push('Actie uitgevoerd: ' + action);
+} else {
+  reasons.push('Geen wijziging nodig op thermostaat');
+}
+
+// Solar buffer status opslaan
+await setLogicVar(SOLAR_BOOST_ACTIVE_VARIABLE, 'boolean', solarBoostActive);
+
+// --------------------------
+// Logging
+// --------------------------
+const timestamp = nowLocal();
+const reasonText = reasons.join(' | ');
+const modeChanged = mode !== previousMode;
+const targetChangedVsPreviousRun = Number(previousTarget) !== Number(target);
+
+const summary =
+  '[' + timestamp + ']' +
+  ' mode=' + mode +
+  ', isHome=' + isHome +
+  ', presentUsers=' + presentUsers.map(function(u) { return u.name; }).join(',') +
+  ', grid=' + grid + 'W' +
+  ', priceNow=' + round(priceNow) +
+  ', rankToday=' + currentRankToday +
+  ', solarBoostActive=' + solarBoostActive +
+  ', solarOnThreshold=' + GRID_SOLAR_BOOST_ON_WATT +
+  ', solarOffThreshold=' + GRID_SOLAR_BOOST_OFF_WATT +
+  ', pricesCount=' + pricesToday.length +
+  ', cheapThreshold=' + (priceBands ? round(cheapThreshold) : 'n/a') +
+  ', expensiveThreshold=' + (priceBands ? round(expensiveThreshold) : 'n/a') +
+  ', isCheapHour=' + isCheapHour +
+  ', isExpensiveHour=' + isExpensiveHour +
+  ', currentTarget=' + currentTarget +
+  ', target=' + target +
+  ', changed=' + changed +
+  ', reason=' + reasonText;
+
+await appendLogLine(summary);
+await setLogicVar(LAST_REASON_VARIABLE, 'string', reasonText);
+await setLogicVar(LAST_MODE_VARIABLE, 'string', mode);
+await setLogicVar(LAST_TARGET_VARIABLE, 'number', target);
+await setLogicVar(LAST_RUN_VARIABLE, 'string', timestamp);
+
+// --------------------------
+// Timeline
+// --------------------------
+let timelineSent = false;
+let timelineText = '';
+
+if (SEND_TIMELINE_ON_CHANGE && (changed || modeChanged || targetChangedVsPreviousRun)) {
+  timelineText =
+    'Thermostaat ' + mode +
+    ': ' + currentTarget + '->' + target +
+    ', prijs nu ' + round(priceNow) + ' EUR/kWh' +
+    ', rang #' + currentRankToday +
+    ', grid ' + grid + 'W' +
+    '. Reden: ' + reasonText;
+
+  timelineSent = await addTimeline(timelineText);
+}
+
+// --------------------------
+// Return
+// --------------------------
+return {
+  mode: mode,
+  isHome: isHome,
+  presenceSource: presenceSource,
+  presentUsers: presentUsers,
+  presentCount: presentUsers.length,
+  grid: grid,
+  priceNow: priceNow,
+  currentRankToday: currentRankToday,
+  currentTarget: currentTarget,
+  target: target,
+  changed: changed,
+  action: action,
+  pricesCount: pricesToday.length,
+  cheapThreshold: cheapThreshold,
+  expensiveThreshold: expensiveThreshold,
+  isCheapHour: isCheapHour,
+  isExpensiveHour: isExpensiveHour,
+  isCheapHourByRank: isCheapHourByRank,
+  isExpensiveHourByRank: isExpensiveHourByRank,
+  solarBoostActive: solarBoostActive,
+  previousSolarBoostActive: previousSolarBoostActive,
+  solarBoostOnThreshold: GRID_SOLAR_BOOST_ON_WATT,
+  solarBoostOffThreshold: GRID_SOLAR_BOOST_OFF_WATT,
+  modeChanged: modeChanged,
+  hysteresisHeld: hysteresisHeld,
+  previousMode: previousMode,
+  previousTarget: previousTarget,
+  reason: reasonText,
+  reasons: reasons,
+  timelineSent: timelineSent,
+  timelineText: timelineText,
+  logVariable: LOG_VARIABLE
+};
