@@ -3,9 +3,9 @@
 // Trigger: dagelijks om 21:30 lokaal
 // ==========================
 
-const LAT = 52.44;
-const LON = 4.82;
-const TILT = 7;          // huidige instelling — pas aan op basis van aanbeveling
+const LAT = 52.4775;
+const LON = 4.7974;
+const TILT = 17;
 const KWP = 8.8;
 const AZIMUTH = -30;
 
