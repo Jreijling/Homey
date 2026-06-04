@@ -467,6 +467,7 @@ await stellogicaVariabeleIn(LAATSTE_REDEN_VARIABELE, 'string', redenenTekst);
 await stellogicaVariabeleIn(LAATSTE_MODUS_VARIABELE, 'string', modus);
 await stellogicaVariabeleIn(LAATSTE_DOELTEMP_VARIABELE, 'number', doeltemp);
 await stellogicaVariabeleIn(LAATSTE_RESULTAAT_VARIABELE, 'string', timestamp);
+await stellogicaVariabeleIn(IS_DUUR_UUR_VARIABELE, 'boolean', isDuurUur);
 await stellogicaVariabeleIn('buffervat_temp_debug', 'string', warmtepompTemperatuurInfo.temperatuurDebugLijst);
 
 // --------------------------
