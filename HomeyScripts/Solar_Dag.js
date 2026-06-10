@@ -5,7 +5,7 @@
 
 const LAT = 52.4775;
 const LON = 4.7974;
-const TILT = 27;
+const TILT = 32;
 const KWP = 8.8;
 const AZIMUTH = -30;
 
