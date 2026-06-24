@@ -5,9 +5,10 @@
 // --- JOUW INSTELLINGEN ---
 const LAT = 52.4775;
 const LON = 4.7974;
-const TILT = 32;
+const TILT = 5;
 const KWP = 8.8;
 const AZIMUTH = -30;
+const FORECAST_CORRECTIE = 1.0; // Schaalfactor voor prognose — pas aan op basis van calibratieadvies
 
 const VARIABLE_NAME = "solar_forecast";
 
@@ -117,7 +118,7 @@ if (!data.result?.watt_hours) {
 // --------------------------
 
 let solarForecast = getKwhNextHoursFromCumulative(data.result.watt_hours, 3);
-solarForecast = round(solarForecast, 2);
+solarForecast = round(solarForecast * FORECAST_CORRECTIE, 2);
 
 // vorige waarde ophalen
 const previousForecast = await getLogicNumber(VARIABLE_NAME, 0);
@@ -155,5 +156,6 @@ return {
   lon: LON,
   tilt: TILT,
   azimuth: AZIMUTH,
-  kwp: KWP
+  kwp: KWP,
+  forecastCorrectie: FORECAST_CORRECTIE
 };

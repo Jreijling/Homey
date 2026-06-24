@@ -4,9 +4,10 @@
 
 const LAT = 52.4775;
 const LON = 4.7974;
-const TILT = 32;
+const TILT = 5;
 const KWP = 8.8;
 const AZIMUTH = -30;
+const FORECAST_CORRECTIE = 1.0; // Schaalfactor voor prognose — pas aan op basis van calibratieadvies
 
 const DEVICE_NAME = 'Zonnepanelen';
 
@@ -77,10 +78,10 @@ const firstEntry = todayEntries[0];
 const currentEntry = todayEntries.filter(e => e.time <= now).pop();
 
 const forecastSoFar = (currentEntry && firstEntry)
-  ? round((currentEntry.wh - firstEntry.wh) / 1000, 2)
+  ? round(((currentEntry.wh - firstEntry.wh) / 1000) * FORECAST_CORRECTIE, 2)
   : 0;
 
-const todayTotalForecast = round((data.result.watt_hours_day?.[todayStr] ?? 0) / 1000, 2);
+const todayTotalForecast = round(((data.result.watt_hours_day?.[todayStr] ?? 0) / 1000) * FORECAST_CORRECTIE, 2);
 const pct = forecastSoFar > 0 ? round((actualKwh / forecastSoFar) * 100, 0) : null;
 
 // --------------------------
