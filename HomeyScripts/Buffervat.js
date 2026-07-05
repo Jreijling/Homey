@@ -1,18 +1,19 @@
 // ==========================
 // Warmwaterbuffer (Buffervat) - Homey Script
 // Verwarmen / verlagen op basis van:
-// 1. Vakantie -> minimum temperatuur (geen zonne-boost)
-// 2. Zonne-overschot -> BOOST
-// 3. 8 duurste uren -> ECO
-// 4. 10 goedkoopste uren -> BOOST
-// 5. Anders -> NORMAAL
+// 1. Vakantie -> minimum temperatuur (geen zonne-boost, geen negatieve-prijs-boost)
+// 2. Negatieve all-in prijs -> BOOST 56°C (verbruiken loont, overschrijft ECO)
+// 3. 8 duurste uren -> ECO (zon genegeerd, terugleveren loont meer)
+// 4. Zonne-overschot ÉN 10 goedkoopste uren tegelijk -> BOOST 56°C
+// 5. Alleen 10 goedkoopste uren (geen zon) -> BOOST 52°C
+// 6. Anders (incl. zon zonder goedkoop uur) -> NORMAAL (zon gaat terug het net op)
 // Met logging + redenen + optionele Timeline
 // ==========================
 
 // ---------- Apparaat IDs ----------
 const P1_APPARAAT_ID = '3755a652-027b-41bb-b188-ab2ac592ee04';
 const WARMTEPOMP_ID = 'd9a883d7-6322-4b73-820d-cd259bde862c';
-const DYNAMISCHE_ENERGIE_PRIJS_ID = '48b55814-c41c-4b0b-a65a-b7c5a21182e0'; // NL_Nederland
+const DYNAMISCHE_ENERGIE_PRIJS_ID = '258709da-1343-4210-95ec-4efa45e354b0'; // Power by the Hour: NL_15Minutes (Frank Energie opslag)
 
 // ---------- Instellingen warmtepomp doeltemperaturen ----------
 const VAKANTIE_TEMPERATUUR = 45;
@@ -26,10 +27,17 @@ const ZONNE_BOOST_AAN_WATT = -2500;   // boost INSCHAKELEN
 const ZONNE_BOOST_UIT_WATT = -500;    // boost UITSCHAKELEN
 
 // ---------- Prijs instellingen ----------
+// meter_rank_price_h0_this_day rangschikt op kwartierblokken (96/dag ipv 24 uren),
+// dus "aantal uren" wordt hieronder omgerekend naar blokken (x4).
 const GOEDKOOPSTE_UREN_AANTAL = 10;
 const DUURSTE_UREN_AANTAL = 8;
-const DAG_UREN_AANTAL = 24;
+const BLOKKEN_PER_DAG = 96;
 const SOLAR_FORECAST_SKIP_BOOST_KWH = 3;
+
+// ---------- All-in prijs (voor negatieve-prijs-detectie) ----------
+// meter_price_h0 bevat kale EPEX + Frank Energie opslag, exclusief energiebelasting/BTW.
+const ENERGIEBELASTING_PER_KWH = 0.0916; // excl. BTW, overheidstarief 2026
+const BTW_FACTOR = 1.21;
 
 // ---------- Logging ----------
 const LOG_MAX_REGELS = 40;
@@ -279,19 +287,13 @@ if (!Number.isFinite(huidigePrijsRang)) {
   throw new Error('Ongeldige prijsrang uit DAP-apparaat');
 }
 
-// In deze setup: #1 = goedkoopst, #24 = duurst
-const isGoedkoopUur = huidigePrijsRang <= GOEDKOOPSTE_UREN_AANTAL;
-const isDuurUur = huidigePrijsRang > (DAG_UREN_AANTAL - DUURSTE_UREN_AANTAL);
+// In deze setup: #1 = goedkoopst, #96 = duurst (kwartierblokken)
+const isGoedkoopUur = huidigePrijsRang <= (GOEDKOOPSTE_UREN_AANTAL * 4);
+const isDuurUur = huidigePrijsRang > (BLOKKEN_PER_DAG - (DUURSTE_UREN_AANTAL * 4));
 
-// Alleen voor logging/debug
-let zichtbarePrijsblokken = 0;
-for (let i = 0; i < 24; i++) {
-  const capaciteitNaam = 'meter_price_h' + i;
-  const capaciteit = dapCapaciteiten[capaciteitNaam];
-  if (capaciteit && capaciteit.value != null && Number.isFinite(Number(capaciteit.value))) {
-    zichtbarePrijsblokken++;
-  }
-}
+// All-in prijs = kale prijs + energiebelasting, incl. BTW
+const huidigePrijsAllIn = afronding((huidigePrijs + ENERGIEBELASTING_PER_KWH) * BTW_FACTOR, 4);
+const isNegatieveAllInPrijs = huidigePrijsAllIn < 0;
 
 // ---------- Vakantie ----------
 const opVakantie = await haalVariabele('vakantie', false);
@@ -338,35 +340,42 @@ let modus = 'NORMAAL';
 let redenen = [];
 let doeltemp = NORMAAL_TEMPERATUUR;
 
-redenen.push('Huidige prijs: ' + afronding(huidigePrijs));
-redenen.push('Prijsrang vandaag: #' + huidigePrijsRang + ' (1 = goedkoopst)');
+redenen.push('Huidige prijs: ' + afronding(huidigePrijs, 4) + ' (all-in: ' + huidigePrijsAllIn + ')');
+redenen.push('Prijsrang vandaag: #' + huidigePrijsRang + '/' + BLOKKEN_PER_DAG + ' (1 = goedkoopst)');
 redenen.push('Goedkoop uur: ' + isGoedkoopUur);
 redenen.push('Duur uur: ' + isDuurUur);
-redenen.push('Zichtbare prijsblokken: ' + zichtbarePrijsblokken);
+redenen.push('Negatieve all-in prijs: ' + isNegatieveAllInPrijs);
 redenen.push(zonnebufferReden);
 
 // Prioriteit:
-// 1. vakantie -> VAKANTIE (minimum, geen zonne-boost)
-// 2. duurste 8 uren -> ECO (zonne-overschot NIET gebruikt: stroom verkopen loont meer)
-// 3. zonne-overschot (tijdens niet-dure uren) -> BOOST
-// 4. goedkoopste 10 uren -> BOOST
-// 5. anders -> NORMAAL
+// 1. vakantie -> VAKANTIE (minimum, geen zonne-boost, geen negatieve-prijs-boost)
+// 2. negatieve all-in prijs -> BOOST_NEGATIEF (56°C, overschrijft ECO — verbruiken loont letterlijk)
+// 3. duurste 8 uren -> ECO (zonne-overschot NIET gebruikt: stroom verkopen loont meer)
+// 4. zonne-overschot ÉN goedkoopste 10 uren tegelijk -> BOOST_ZONNE_PRIJS (56°C)
+// 5. alleen goedkoopste 10 uren (geen zon) -> BOOST_GOEDKOOP (52°C)
+// 6. anders -> NORMAAL
+// Let op: zonneBoostActief is al forecast-gated (SOLAR_FORECAST_SKIP_BOOST_KWH), dus
+// BOOST_ZONNE_PRIJS vereist zowel voldoende zon-forecast als een goedkoop uur.
 if (opVakantie) {
   modus = 'VAKANTIE';
   doeltemp = VAKANTIE_TEMPERATUUR;
-  redenen.push('Vakantie: buffervat op minimum temperatuur (zonne-overschot genegeerd)');
+  redenen.push('Vakantie: buffervat op minimum temperatuur (zonne-overschot en negatieve prijs genegeerd)');
+} else if (isNegatieveAllInPrijs) {
+  modus = 'BOOST_NEGATIEF';
+  doeltemp = BOOST_TEMPERATUUR_ZONNE;
+  redenen.push('Buffervat naar 56°C: all-in prijs is negatief (' + huidigePrijsAllIn + ' €/kWh) — verbruiken is nu voordelig');
 } else if (isDuurUur) {
   modus = 'ECO_DUUR';
   doeltemp = ECO_TEMPERATUUR;
   redenen.push('Buffervat naar ECO: duurste ' + DUURSTE_UREN_AANTAL + ' uren — zonne-overschot niet gebruikt, stroom terugleveren loont meer');
-} else if (zonneBoostActief) {
-  modus = 'BOOST_ZONNE';
+} else if (zonneBoostActief && isGoedkoopUur) {
+  modus = 'BOOST_ZONNE_PRIJS';
   doeltemp = BOOST_TEMPERATUUR_ZONNE;
-  redenen.push('Buffervat verwarmen op zonne-overschot (prijzen niet hoog)');
+  redenen.push('Buffervat naar 56°C: zon-overschot én goedkoop uur (rang #' + huidigePrijsRang + ') tegelijk actief');
 } else if (isGoedkoopUur) {
   modus = 'BOOST_GOEDKOOP';
   doeltemp = BOOST_TEMPERATUUR_STANDAARD;
-  redenen.push('Buffervat verwarmen omdat huidig uur in de ' + GOEDKOOPSTE_UREN_AANTAL + ' goedkoopste uren valt (solar forecast: ' + solarForecast + ' kWh)');
+  redenen.push('Buffervat naar 52°C: goedkoop uur (rang #' + huidigePrijsRang + '), maar geen zon-overschot (solar forecast: ' + solarForecast + ' kWh)');
 } else {
   modus = 'NORMAAL';
   doeltemp = NORMAAL_TEMPERATUUR;
@@ -376,7 +385,7 @@ if (opVakantie) {
 // --------------------------
 // COP-optimalisatie (alleen buiten BOOST-modi)
 // --------------------------
-const isBooostModus = (modus === 'BOOST_ZONNE' || modus === 'BOOST_GOEDKOOP');
+const isBooostModus = (modus === 'BOOST_ZONNE_PRIJS' || modus === 'BOOST_GOEDKOOP' || modus === 'BOOST_NEGATIEF');
 
 if (!isBooostModus) {
   if (buitentemp > 15) doeltemp = Math.min(doeltemp, 53);
@@ -411,7 +420,7 @@ const huidigePowerfulModus = warmtepomp.capabilitiesObj['fan_mode.powerful']
   : 'off';
 const tankOpTemperatuur = warmtepompTemperatuurInfo.gemetenTemperatuur != null
   && warmtepompTemperatuurInfo.gemetenTemperatuur >= (doeltemp - 1);
-const gewenstePowerfulModus = (modus === 'BOOST_ZONNE' && !tankOpTemperatuur) ? 'on' : 'off';
+const gewenstePowerfulModus = ((modus === 'BOOST_ZONNE_PRIJS' || modus === 'BOOST_NEGATIEF') && !tankOpTemperatuur) ? 'on' : 'off';
 
 if (doeltemp !== huidigDoeltemperatuur) {
   await warmtepomp.setCapabilityValue('target_temperature', doeltemp);
@@ -446,11 +455,12 @@ const samenvatting =
   ', uur=' + uur +
   ', opVakantie=' + opVakantie +
   ', netwerk=' + netwerkvermogen +
-  ', huidigePrijs=' + afronding(huidigePrijs) +
-  ', rangVandaag=' + huidigePrijsRang +
+  ', huidigePrijs=' + afronding(huidigePrijs, 4) +
+  ', huidigePrijsAllIn=' + huidigePrijsAllIn +
+  ', rangVandaag=' + huidigePrijsRang + '/' + BLOKKEN_PER_DAG +
   ', isGoedkoopUur=' + isGoedkoopUur +
   ', isDuurUur=' + isDuurUur +
-  ', zichtbarePrijsblokken=' + zichtbarePrijsblokken +
+  ', isNegatieveAllInPrijs=' + isNegatieveAllInPrijs +
   ', zonneBoostActief=' + zonneBoostActief +
   ', solarForecast=' + solarForecast +
   ', buitentemp=' + buitentemp +
@@ -492,10 +502,12 @@ return {
   uur: uur,
   netwerk: netwerkvermogen,
   huidigePrijs: huidigePrijs,
+  huidigePrijsAllIn: huidigePrijsAllIn,
   rangVandaag: huidigePrijsRang,
+  blokkenPerDag: BLOKKEN_PER_DAG,
   isGoedkoopUur: isGoedkoopUur,
   isDuurUur: isDuurUur,
-  zichtbarePrijsblokken: zichtbarePrijsblokken,
+  isNegatieveAllInPrijs: isNegatieveAllInPrijs,
   zonneBoostAan: zonneBoostAan,
   zonneBoostActief: zonneBoostActief,
   solarForecast: solarForecast,

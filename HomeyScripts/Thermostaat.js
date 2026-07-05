@@ -8,7 +8,7 @@
 // ---------- Apparaat IDs ----------
 const THERMOSTAAT_ID = '295b3cbb-2cc4-4e4d-9996-294cdf6b2cd0';
 const P1_APPARAAT_ID = '3755a652-027b-41bb-b188-ab2ac592ee04';
-const DYNAMISCHE_ENERGIE_PRIJS_ID = '48b55814-c41c-4b0b-a65a-b7c5a21182e0'; // NL_Nederland
+const DYNAMISCHE_ENERGIE_PRIJS_ID = '258709da-1343-4210-95ec-4efa45e354b0'; // Power by the Hour: NL_15Minutes (Frank Energie opslag)
 
 // ---------- Setpoints (vloerverwarming - Verwarming) ----------
 const SETPOINT_VAKANTIE = 18.0;
@@ -30,8 +30,11 @@ const ZONNE_BOOST_UIT_WATT = -400;       // boost UITSCHAKELEN als overschot gro
 const SURPLUS_OVERSCHOT_WATT = -1000;    // Extra overschot beschikbaar voor Thermostaat ook
 
 // ---------- Prijs instellingen ----------
+// meter_rank_price_h0_this_day rangschikt op kwartierblokken (96/dag ipv 24 uren),
+// dus "aantal uren" wordt hieronder omgerekend naar blokken (x4).
 const GOEDKOOPSTE_UREN_AANTAL = 10;
 const DUURSTE_UREN_AANTAL = 8;
+const BLOKKEN_PER_DAG = 96;
 
 // ---------- Logging ----------
 const LOG_MAX_REGELS = 40;
@@ -160,33 +163,6 @@ async function voegTijdlijnToe(tekst) {
   }
 }
 
-function berekenPrijsbanden(prijzen) {
-  const geldig = prijzen
-    .map(function(x) { return Number(x); })
-    .filter(function(x) { return Number.isFinite(x); });
-
-  if (geldig.length < 2) {
-    return null;
-  }
-
-  const sorteerAscending = geldig.slice().sort(function(a, b) { return a - b; });
-  const sorteerDescending = geldig.slice().sort(function(a, b) { return b - a; });
-
-  const goedkoopAantal = Math.min(GOEDKOOPSTE_UREN_AANTAL, sorteerAscending.length);
-  const duurAantal = Math.min(DUURSTE_UREN_AANTAL, sorteerDescending.length);
-
-  const goedkoopSegment = sorteerAscending.slice(0, goedkoopAantal);
-  const duurSegment = sorteerDescending.slice(0, duurAantal);
-
-  return {
-    goedkoopDrempel: goedkoopSegment[goedkoopSegment.length - 1],
-    duurDrempel: duurSegment[duurSegment.length - 1],
-    goedkoopSegment: goedkoopSegment,
-    duurSegment: duurSegment,
-    aantal: geldig.length
-  };
-}
-
 // --------------------------
 // Apparaten ophalen
 // --------------------------
@@ -253,34 +229,12 @@ if (!Number.isFinite(huidigePrijsRang)) {
   throw new Error('Ongeldige prijsrang uit DEP-apparaat');
 }
 
-const prijzenVandaag = [];
-for (let i = 0; i < 24; i++) {
-  const capaciteitNaam = 'meter_price_h' + i;
-  const capaciteit = depCapaciteiten[capaciteitNaam];
-
-  if (capaciteit && capaciteit.value != null) {
-    const prijs = Number(capaciteit.value);
-    if (Number.isFinite(prijs)) {
-      prijzenVandaag.push(prijs);
-    }
-  }
-}
-
-const prijsbanden = berekenPrijsbanden(prijzenVandaag);
-const goedkoopDrempel = prijsbanden ? prijsbanden.goedkoopDrempel : null;
-const duurDrempel = prijsbanden ? prijsbanden.duurDrempel : null;
-
 // BELANGRIJK:
-// rang 1 = goedkoopste uur
-const isGoedkoopUurPerRang = huidigePrijsRang <= GOEDKOOPSTE_UREN_AANTAL;
-const isDuurUurPerRang = prijzenVandaag.length >= DUURSTE_UREN_AANTAL
-  ? huidigePrijsRang > (prijzenVandaag.length - DUURSTE_UREN_AANTAL)
-  : false;
+// rang 1 = goedkoopste blok, rang schaalt over 96 kwartierblokken/dag
+const isGoedkoopUurPerRang = huidigePrijsRang <= (GOEDKOOPSTE_UREN_AANTAL * 4);
+const isDuurUurPerRang = huidigePrijsRang > (BLOKKEN_PER_DAG - (DUURSTE_UREN_AANTAL * 4));
 
-const isGoedkoopUurPerDrempel = prijsbanden ? huidigePrijs <= goedkoopDrempel : false;
-const isDuurUurPerDrempel = prijsbanden ? huidigePrijs >= duurDrempel : false;
-
-// Gebruik rang als primaire bron (geen drempels meer)
+// Gebruik rang als primaire (en enige) bron
 const isGoedkoopUur = isGoedkoopUurPerRang;
 const isDuurUur = isDuurUurPerRang;
 
@@ -439,13 +393,10 @@ const samenvatting =
   ', aanwezigenAantal=' + aanwezigenGebruikers.length +
   ', netwerk=' + netwerkvermogen + 'W' +
   ', huidigePrijs=' + afronding(huidigePrijs) +
-  ', rangVandaag=' + huidigePrijsRang +
+  ', rangVandaag=' + huidigePrijsRang + '/' + BLOKKEN_PER_DAG +
   ', zonneBoostActief=' + zonneBoostActief +
   ', zonneAanDrempel=' + ZONNE_BOOST_AAN_WATT +
   ', zonneUitDrempel=' + ZONNE_BOOST_UIT_WATT +
-  ', prijzenAantal=' + prijzenVandaag.length +
-  ', goedkoopDrempel=' + (prijsbanden ? afronding(goedkoopDrempel) : 'n/a') +
-  ', duurDrempel=' + (prijsbanden ? afronding(duurDrempel) : 'n/a') +
   ', isGoedkoopUur=' + isGoedkoopUur +
   ', isDuurUur=' + isDuurUur +
   ', huidigDoeltemp=' + huidigDoeltemperatuur +
@@ -497,9 +448,7 @@ return {
   doeltemp: doeltemp,
   gewijzigd: gewijzigd,
   actie: actie,
-  prijzenAantal: prijzenVandaag.length,
-  goedkoopDrempel: goedkoopDrempel,
-  duurDrempel: duurDrempel,
+  blokkenPerDag: BLOKKEN_PER_DAG,
   isGoedkoopUur: isGoedkoopUur,
   isDuurUur: isDuurUur,
   isGoedkoopUurPerRang: isGoedkoopUurPerRang,
