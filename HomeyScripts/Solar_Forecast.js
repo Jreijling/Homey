@@ -10,7 +10,8 @@ const KWP = 8.8;
 const AZIMUTH = -30;
 const FORECAST_CORRECTIE = 1.67; // Schaalfactor voor prognose — pas aan op basis van calibratieadvies
 
-const VARIABLE_NAME = "solar_forecast";
+const VARIABLE_NAME = "solar_forecast"; // rollend venster komende 3 uur
+const DAG_VARIABLE_NAME = "solar_forecast_dag"; // totale verwachte opbrengst hele kalenderdag
 
 // Timeline instellingen
 const SEND_TIMELINE = true;
@@ -22,6 +23,15 @@ const MIN_CHANGE_FOR_TIMELINE = 0.3; // kWh verschil voordat we melden
 
 function parseForecastDate(s) {
   return new Date(s.replace(" ", "T"));
+}
+
+function getAmsterdamOffsetHours(date) {
+  const year = date.getUTCFullYear();
+  const lastSundayMarch = new Date(Date.UTC(year, 2, 31));
+  lastSundayMarch.setUTCDate(31 - lastSundayMarch.getUTCDay());
+  const lastSundayOct = new Date(Date.UTC(year, 9, 31));
+  lastSundayOct.setUTCDate(31 - lastSundayOct.getUTCDay());
+  return (date >= lastSundayMarch && date < lastSundayOct) ? 2 : 1;
 }
 
 function round(value, decimals = 2) {
@@ -124,11 +134,18 @@ solarForecast = round(solarForecast * FORECAST_CORRECTIE, 2);
 const previousForecast = await getLogicNumber(VARIABLE_NAME, 0);
 const delta = round(solarForecast - previousForecast, 2);
 
+// Totale verwachte opbrengst hele kalenderdag (00:00-24:00, lokale tijd)
+const now = new Date();
+const tzOffset = getAmsterdamOffsetHours(now);
+const todayStr = new Date(now.getTime() + tzOffset * 3600000).toISOString().slice(0, 10);
+const solarForecastDag = round(((data.result.watt_hours_day?.[todayStr] ?? 0) / 1000) * FORECAST_CORRECTIE, 2);
+
 // --------------------------
 // Opslaan
 // --------------------------
 
 await setLogicNumber(VARIABLE_NAME, solarForecast);
+await setLogicNumber(DAG_VARIABLE_NAME, solarForecastDag);
 
 // --------------------------
 // Timeline
@@ -150,6 +167,7 @@ return {
   solarForecastKwhNext3h: solarForecast,
   previous: previousForecast,
   delta,
+  solarForecastKwhDag: solarForecastDag,
   timelineSent,
   timelineText,
   lat: LAT,

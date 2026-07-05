@@ -117,6 +117,8 @@ const alleInNu = alleInPrijs(prijsNu);
 const alleInOver15Min = prijsOver15Min != null ? alleInPrijs(prijsOver15Min) : null;
 const alleInMorgenLaagste = prijsMorgenLaagste != null ? alleInPrijs(prijsMorgenLaagste) : null;
 
+await stelLogicaVariabeleIn('electra_prijs', 'number', alleInNu);
+
 const nu = haalLokaalDatum();
 const vandaag = maakDagSleutel(nu);
 
