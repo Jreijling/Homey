@@ -8,7 +8,7 @@ const LON = 4.7974;
 const TILT = 5;
 const KWP = 8.8;
 const AZIMUTH = -30;
-const FORECAST_CORRECTIE = 1.67; // Schaalfactor voor prognose — pas aan op basis van calibratieadvies
+const FORECAST_CORRECTIE = 1.94; // Schaalfactor voor prognose — pas aan op basis van calibratieadvies
 
 const DEVICE_NAME = 'Zonnepanelen';
 
