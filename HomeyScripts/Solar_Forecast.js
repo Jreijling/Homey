@@ -16,6 +16,7 @@ const DAG_VARIABLE_NAME = "solar_forecast_dag"; // totale verwachte opbrengst he
 // Timeline instellingen
 const SEND_TIMELINE = true;
 const MIN_CHANGE_FOR_TIMELINE = 0.3; // kWh verschil voordat we melden
+const DAG_MELDING_UUR = 6; // lokaal uur waarin de dagprognose gemeld wordt i.p.v. de 3-uursprognose
 
 // --------------------------
 // Helpers
@@ -137,7 +138,8 @@ const delta = round(solarForecast - previousForecast, 2);
 // Totale verwachte opbrengst hele kalenderdag (00:00-24:00, lokale tijd)
 const now = new Date();
 const tzOffset = getAmsterdamOffsetHours(now);
-const todayStr = new Date(now.getTime() + tzOffset * 3600000).toISOString().slice(0, 10);
+const localNow = new Date(now.getTime() + tzOffset * 3600000);
+const todayStr = localNow.toISOString().slice(0, 10);
 const solarForecastDag = round(((data.result.watt_hours_day?.[todayStr] ?? 0) / 1000) * FORECAST_CORRECTIE, 2);
 
 // --------------------------
@@ -154,7 +156,10 @@ await setLogicNumber(DAG_VARIABLE_NAME, solarForecastDag);
 let timelineSent = false;
 let timelineText = '';
 
-if (SEND_TIMELINE && Math.abs(delta) >= MIN_CHANGE_FOR_TIMELINE) {
+if (SEND_TIMELINE && localNow.getUTCHours() === DAG_MELDING_UUR) {
+  timelineText = `☀️ Verwachte opbrengst vandaag: ${solarForecastDag} kWh`;
+  timelineSent = await addTimeline(timelineText);
+} else if (SEND_TIMELINE && Math.abs(delta) >= MIN_CHANGE_FOR_TIMELINE) {
   timelineText = `☀️ Zon verwachting komende 3 uur: ${solarForecast} kWh (${delta >= 0 ? '+' : ''}${delta})`;
   timelineSent = await addTimeline(timelineText);
 }
