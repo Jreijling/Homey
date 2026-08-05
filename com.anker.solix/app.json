@@ -1,7 +1,7 @@
 {
   "id": "com.anker.solix",
-  "version": "1.0.0",
-  "compatibility": ">=5.0.0",
+  "version": "1.0.10",
+  "compatibility": ">=12.0.0",
   "sdk": 3,
   "platforms": ["local", "cloud"],
   "brandColor": "#0066CC",
@@ -41,7 +41,7 @@
       "step": 1,
       "decimals": 0,
       "uiComponent": "sensor",
-      "icon": "/assets/icon.svg"
+      "icon": "/assets/capabilities/solar_power.svg"
     },
     "battery_charge_power": {
       "type": "number",
@@ -55,7 +55,7 @@
       "step": 1,
       "decimals": 0,
       "uiComponent": "sensor",
-      "icon": "/assets/icon.svg"
+      "icon": "/assets/capabilities/battery_charge_power.svg"
     },
     "battery_discharge_power": {
       "type": "number",
@@ -69,7 +69,7 @@
       "step": 1,
       "decimals": 0,
       "uiComponent": "sensor",
-      "icon": "/assets/icon.svg"
+      "icon": "/assets/capabilities/battery_discharge_power.svg"
     },
     "ac_output_power": {
       "type": "number",
@@ -83,7 +83,7 @@
       "step": 1,
       "decimals": 0,
       "uiComponent": "sensor",
-      "icon": "/assets/icon.svg"
+      "icon": "/assets/capabilities/ac_output_power.svg"
     },
     "output_preset_power": {
       "type": "number",
@@ -97,7 +97,7 @@
       "step": 10,
       "decimals": 0,
       "uiComponent": "slider",
-      "icon": "/assets/icon.svg"
+      "icon": "/assets/capabilities/output_preset_power.svg"
     },
     "battery_min_soc": {
       "type": "number",
@@ -111,7 +111,7 @@
       "step": 5,
       "decimals": 0,
       "uiComponent": "slider",
-      "icon": "/assets/icon.svg"
+      "icon": "/assets/capabilities/battery_min_soc.svg"
     },
     "grid_export_enabled": {
       "type": "boolean",
@@ -120,7 +120,7 @@
       "setable": true,
       "insights": false,
       "uiComponent": "toggle",
-      "icon": "/assets/icon.svg"
+      "icon": "/assets/capabilities/grid_export_enabled.svg"
     },
     "home_load_power": {
       "type": "number",
@@ -134,7 +134,7 @@
       "step": 1,
       "decimals": 0,
       "uiComponent": "sensor",
-      "icon": "/assets/icon.svg"
+      "icon": "/assets/capabilities/home_load_power.svg"
     },
     "grid_import_power": {
       "type": "number",
@@ -148,7 +148,7 @@
       "step": 1,
       "decimals": 0,
       "uiComponent": "sensor",
-      "icon": "/assets/icon.svg"
+      "icon": "/assets/capabilities/grid_import_power.svg"
     },
     "grid_export_power": {
       "type": "number",
@@ -162,14 +162,14 @@
       "step": 1,
       "decimals": 0,
       "uiComponent": "sensor",
-      "icon": "/assets/icon.svg"
+      "icon": "/assets/capabilities/grid_export_power.svg"
     }
   },
   "drivers": [
     {
       "id": "solarbank",
       "name": { "en": "Solarbank", "nl": "Solarbank" },
-      "class": "other",
+      "class": "battery",
       "platforms": ["local", "cloud"],
       "capabilities": [
         "measure_battery",
@@ -197,7 +197,14 @@
       "pair": [
         {
           "id": "list_devices",
-          "template": "list_devices"
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
         }
       ]
     },
@@ -220,7 +227,14 @@
       "pair": [
         {
           "id": "list_devices",
-          "template": "list_devices"
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
         }
       ]
     },
@@ -257,7 +271,14 @@
       "pair": [
         {
           "id": "list_devices",
-          "template": "list_devices"
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
         }
       ]
     }

@@ -8,8 +8,5 @@
   },
   "scripts": {
     "start": "homey app run"
-  },
-  "dependencies": {
-    "homey": "*"
   }
 }

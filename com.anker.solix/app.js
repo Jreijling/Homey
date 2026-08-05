@@ -2,24 +2,31 @@
 
 const Homey = require('homey');
 const { AnkerSolixApi } = require('./lib/AnkerSolixApi');
+const { readModbusSnapshot } = require('./lib/AnkerSolixModbusReader');
 
 const DEFAULT_POLL_INTERVAL_S = 60;
 const MIN_POLL_INTERVAL_S     = 30;
+const MODBUS_POLL_INTERVAL_MS = 10000;
 
 class AnkerSolixApp extends Homey.App {
 
   async onInit() {
     this.log('Anker Solix starting...');
 
-    this._api        = null;
-    this._siteCache  = {};   // siteId → { site, sceneData }
-    this._pollTimer  = null;
+    this._api          = null;
+    this._siteCache    = {};   // siteId → { site, sceneData }
+    this._pollTimer    = null;
+    this._modbusTimer  = null;
 
     // Re-initialise API when credentials change in settings
     this.homey.settings.on('set', async key => {
       if (['email', 'password', 'country'].includes(key)) {
         this.log(`Setting "${key}" changed – reconnecting`);
         await this._resetApi();
+      }
+      if (['connection_mode', 'modbus_ip', 'modbus_port'].includes(key)) {
+        this.log(`Setting "${key}" changed – updating Modbus polling`);
+        this._scheduleModbusPoll(0);
       }
     });
 
@@ -33,6 +40,7 @@ class AnkerSolixApp extends Homey.App {
     // Boot
     await this._initApi();
     this._schedulePoll(0); // immediate first poll
+    this._scheduleModbusPoll(0);
   }
 
   // ─── API lifecycle ────────────────────────────────────────────────────────
@@ -69,6 +77,73 @@ class AnkerSolixApp extends Homey.App {
     this._schedulePoll(0);
   }
 
+  // ─── Modbus (local, real-time) ───────────────────────────────────────────
+
+  _modbusEnabled() {
+    return this.homey.settings.get('connection_mode') === 'modbus'
+      && !!this.homey.settings.get('modbus_ip');
+  }
+
+  _cancelModbusPoll() {
+    if (this._modbusTimer) {
+      clearTimeout(this._modbusTimer);
+      this._modbusTimer = null;
+    }
+  }
+
+  _scheduleModbusPoll(delayMs) {
+    this._cancelModbusPoll();
+    if (!this._modbusEnabled()) return;
+
+    this._modbusTimer = setTimeout(async () => {
+      await this._pollModbus();
+      this._scheduleModbusPoll(MODBUS_POLL_INTERVAL_MS);
+    }, delayMs ?? MODBUS_POLL_INTERVAL_MS);
+  }
+
+  /**
+   * Reads live values from the Solarbank over local Modbus TCP and overlays
+   * them onto the cached site data (which is still populated via the cloud
+   * for pairing/site discovery), then emits an update.
+   */
+  async _pollModbus() {
+    if (!this._modbusEnabled()) return;
+
+    const host = this.homey.settings.get('modbus_ip');
+    const port = Number(this.homey.settings.get('modbus_port')) || 502;
+
+    try {
+      const snapshot = await readModbusSnapshot({ host, port });
+
+      for (const { sceneData } of Object.values(this._siteCache)) {
+        const device = sceneData?.solarbank_info?.solarbank_list?.[0];
+        if (device) {
+          device.photovoltaic_power  = String(snapshot.photovoltaic_power);
+          device.bat_charge_power    = String(snapshot.bat_charge_power);
+          device.bat_discharge_power = String(snapshot.bat_discharge_power);
+          device.output_power        = String(snapshot.output_power);
+          device.battery_power       = String(snapshot.battery_power);
+        }
+        if (sceneData?.solarbank_info) {
+          sceneData.solarbank_info.total_photovoltaic_power = String(snapshot.photovoltaic_power);
+        }
+        if (sceneData) {
+          sceneData.home_load_power = String(snapshot.home_load_power);
+        }
+        if (sceneData?.grid_info) {
+          sceneData.grid_info.grid_to_home_power         = String(snapshot.grid_to_home_power);
+          sceneData.grid_info.photovoltaic_to_grid_power  = String(snapshot.photovoltaic_to_grid_power);
+        }
+      }
+
+      this.log(`Modbus poll complete – pv=${snapshot.photovoltaic_power}W soc=${snapshot.battery_power}% charge=${snapshot.bat_charge_power}W discharge=${snapshot.bat_discharge_power}W load=${snapshot.home_load_power}W gridImport=${snapshot.grid_to_home_power}W gridExport=${snapshot.photovoltaic_to_grid_power}W`);
+      this.homey.emit('anker_solix_update', this._siteCache);
+
+    } catch (err) {
+      this.error('Modbus poll error:', err.message);
+    }
+  }
+
   // ─── Polling ──────────────────────────────────────────────────────────────
 
   _pollIntervalMs() {
@@ -103,7 +178,12 @@ class AnkerSolixApp extends Homey.App {
       }
 
       this.log(`Poll complete – ${sites.length} site(s) updated`);
-      this.homey.emit('anker_solix_update', this._siteCache);
+
+      if (this._modbusEnabled()) {
+        await this._pollModbus(); // overlays fresher local values + emits
+      } else {
+        this.homey.emit('anker_solix_update', this._siteCache);
+      }
 
     } catch (err) {
       this.error('Poll error:', err.message);
@@ -155,30 +235,30 @@ class AnkerSolixApp extends Homey.App {
 
   _registerFlowCards() {
     // Conditions (device cards — have a "device" argument)
-    this.homey.flow.getDeviceConditionCard('battery_soc_above')
+    this.homey.flow.getConditionCard('battery_soc_above')
       .registerRunListener(({ device, soc }) => {
         const current = device.getCapabilityValue('measure_battery') ?? 0;
         return current > soc;
       });
 
-    this.homey.flow.getDeviceConditionCard('solar_power_above')
+    this.homey.flow.getConditionCard('solar_power_above')
       .registerRunListener(({ device, watts }) => {
         const current = device.getCapabilityValue('solar_power') ?? 0;
         return current > watts;
       });
 
-    this.homey.flow.getDeviceConditionCard('grid_importing')
+    this.homey.flow.getConditionCard('grid_importing')
       .registerRunListener(({ device }) => {
         return (device.getCapabilityValue('grid_import_power') ?? 0) > 0;
       });
 
     // Actions (device cards — have a "device" argument)
-    this.homey.flow.getDeviceActionCard('set_output_preset')
+    this.homey.flow.getActionCard('set_output_preset')
       .registerRunListener(async ({ device, watts }) => {
         await device.setOutputPreset(watts);
       });
 
-    this.homey.flow.getDeviceActionCard('set_grid_export')
+    this.homey.flow.getActionCard('set_grid_export')
       .registerRunListener(async ({ device, enabled }) => {
         await device.setGridExport(enabled === 'true');
       });
@@ -188,6 +268,7 @@ class AnkerSolixApp extends Homey.App {
 
   async onUninit() {
     this._cancelPoll();
+    this._cancelModbusPoll();
     this.log('Anker Solix stopped');
   }
 }

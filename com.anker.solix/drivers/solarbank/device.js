@@ -45,10 +45,13 @@ class SolarbankDevice extends Homey.Device {
     );
 
     // ── Per-device values ──
+    // Note: "charging_power"/"battery_discharge_power" stay at 0 for this
+    // site topology (power_site_type 19) — the actual live values come
+    // through "bat_charge_power"/"bat_discharge_power" instead.
     if (device) {
-      this._set('measure_battery',     p(device.battery_power));
-      this._set('solar_power',         p(device.photovoltaic_power));
-      this._set('battery_charge_power', p(device.charging_power));
+      this._set('measure_battery',      p(device.battery_power));
+      this._set('solar_power',          p(device.photovoltaic_power));
+      this._set('battery_charge_power', p(device.bat_charge_power ?? device.charging_power));
       this._set('ac_output_power',      p(device.output_power));
 
       if (device.set_load_power !== '') {
@@ -57,11 +60,11 @@ class SolarbankDevice extends Homey.Device {
     }
 
     // ── Site-level values from solarbank_info ──
-    this._set('battery_discharge_power', p(sbInfo.battery_discharge_power));
+    this._set('battery_discharge_power', p(device?.bat_discharge_power ?? sbInfo.battery_discharge_power));
 
     // ── Flow trigger logic ──
-    const chargePower    = p(device?.charging_power);
-    const dischargePower = p(sbInfo.battery_discharge_power);
+    const chargePower    = p(device?.bat_charge_power ?? device?.charging_power);
+    const dischargePower = p(device?.bat_discharge_power ?? sbInfo.battery_discharge_power);
 
     const isCharging    = chargePower    > 0;
     const isDischarging = dischargePower > 0;

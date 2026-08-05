@@ -5,20 +5,37 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Anker Solix Settings</title>
 
-  <script src="/homey.js"></script>
+  <script src="/homey.js" data-origin="settings"></script>
   <script>
     function onHomeyReady(Homey) {
+      init();
       Homey.ready();
 
+      function $(id) { return document.getElementById(id); }
+
+      function showStatus(el, msg, ok) {
+        el.textContent = msg;
+        el.style.color = ok ? '#388e3c' : '#c62828';
+        el.style.display = 'block';
+      }
+
+      function hset(key, value) {
+        return new Promise(function(resolve, reject) {
+          Homey.set(key, value, function(err) {
+            if (err) reject(err); else resolve();
+          });
+        });
+      }
+
+      function hget(key) {
+        return new Promise(function(resolve, reject) {
+          Homey.get(key, function(err, value) {
+            if (err) reject(err); else resolve(value);
+          });
+        });
+      }
+
       function init() {
-        var $ = function(id) { return document.getElementById(id); };
-
-        function showStatus(el, msg, ok) {
-          el.textContent = msg;
-          el.style.color = ok ? '#388e3c' : '#c62828';
-          el.style.display = 'block';
-        }
-
         $('saveBtn').addEventListener('click', function() {
           var email    = $('email').value.trim();
           var password = $('password').value;
@@ -27,36 +44,60 @@
             showStatus($('status'), 'Email and password are required.', false);
             return;
           }
+          showStatus($('status'), 'Saving…', true);
           Promise.all([
-            Homey.set('email',    email),
-            Homey.set('password', password),
-            Homey.set('country',  country),
+            hset('email',    email),
+            hset('password', password),
+            hset('country',  country),
           ]).then(function() {
             showStatus($('status'), 'Saved! App will reconnect.', true);
           }).catch(function(e) {
-            showStatus($('status'), String(e), false);
+            showStatus($('status'), 'Error: ' + (e && e.message ? e.message : e), false);
           });
         });
 
         $('savePollBtn').addEventListener('click', function() {
           var interval = Math.max(30, parseInt($('poll_interval').value) || 60);
           $('poll_interval').value = interval;
-          Homey.set('poll_interval', interval)
+          hset('poll_interval', interval)
             .then(function() { showStatus($('pollStatus'), 'Saved!', true); })
-            .catch(function(e) { showStatus($('pollStatus'), String(e), false); });
+            .catch(function(e) { showStatus($('pollStatus'), 'Error: ' + (e && e.message ? e.message : e), false); });
         });
 
-        if (typeof Homey.get === 'function') {
-          Homey.get('email').then(function(v) { $('email').value = v || ''; }).catch(function(){});
-          Homey.get('country').then(function(v) { $('country').value = (v || 'NL').toUpperCase(); }).catch(function(){});
-          Homey.get('poll_interval').then(function(v) { $('poll_interval').value = v || 60; }).catch(function(){});
+        function updateModbusFieldsVisibility() {
+          var isModbus = $('connection_mode').value === 'modbus';
+          $('modbusFields').style.display = isModbus ? 'block' : 'none';
         }
-      }
+        $('connection_mode').addEventListener('change', updateModbusFieldsVisibility);
 
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-      } else {
-        init();
+        $('saveConnectionBtn').addEventListener('click', function() {
+          var mode = $('connection_mode').value;
+          var ip   = $('modbus_ip').value.trim();
+          var port = Math.max(1, parseInt($('modbus_port').value) || 502);
+          $('modbus_port').value = port;
+
+          if (mode === 'modbus' && !ip) {
+            showStatus($('connectionStatus'), 'IP address is required for Modbus mode.', false);
+            return;
+          }
+          showStatus($('connectionStatus'), 'Saving…', true);
+          Promise.all([
+            hset('connection_mode', mode),
+            hset('modbus_ip',       ip),
+            hset('modbus_port',     port),
+          ]).then(function() {
+            showStatus($('connectionStatus'), 'Saved!', true);
+          }).catch(function(e) {
+            showStatus($('connectionStatus'), 'Error: ' + (e && e.message ? e.message : e), false);
+          });
+        });
+
+        hget('email').then(function(v) { $('email').value = v || ''; }).catch(function(){});
+        hget('country').then(function(v) { $('country').value = (v || 'NL').toUpperCase(); }).catch(function(){});
+        hget('poll_interval').then(function(v) { $('poll_interval').value = v || 60; }).catch(function(){});
+        hget('connection_mode').then(function(v) { $('connection_mode').value = v || 'cloud'; updateModbusFieldsVisibility(); }).catch(function(){});
+        hget('modbus_ip').then(function(v) { $('modbus_ip').value = v || ''; }).catch(function(){});
+        hget('modbus_port').then(function(v) { $('modbus_port').value = v || 502; }).catch(function(){});
       }
     }
   </script>
@@ -76,6 +117,7 @@
     button:active { background: #006fa3; }
     .status { margin-top: 8px; font-size: 13px; display: none; }
     hr { border: none; border-top: 1px solid #eee; margin: 8px 0 14px; }
+    select { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; background: white; }
   </style>
 </head>
 <body>
@@ -98,6 +140,31 @@
   <hr>
   <button id="saveBtn">Save &amp; connect</button>
   <div class="status" id="status"></div>
+</div>
+
+<div class="card">
+  <h2>Live data source</h2>
+  <div class="field">
+    <label for="connection_mode">Connection mode</label>
+    <select id="connection_mode">
+      <option value="cloud">Cloud (Anker servers)</option>
+      <option value="modbus">Modbus TCP (local, real-time)</option>
+    </select>
+    <p class="hint">Modbus TCP gives faster, more accurate live readings for the Solarbank Max AC (updates every ~10s instead of every minute). Requires enabling "Modbus TCP" under Three-Party Control Settings for the device in the Anker app.</p>
+  </div>
+  <div id="modbusFields" style="display:none">
+    <div class="field">
+      <label for="modbus_ip">Device IP address</label>
+      <input id="modbus_ip" type="text" placeholder="192.168.1.50">
+    </div>
+    <div class="field">
+      <label for="modbus_port">Port</label>
+      <input id="modbus_port" type="number" min="1" max="65535" value="502">
+    </div>
+  </div>
+  <hr>
+  <button id="saveConnectionBtn">Save</button>
+  <div class="status" id="connectionStatus"></div>
 </div>
 
 <div class="card">
