@@ -8,7 +8,7 @@ const LON = 4.7974;
 const TILT = 15;
 const KWP = 8.8;
 const AZIMUTH = -30;
-const FORECAST_CORRECTIE = 1.66; // Schaalfactor voor prognose — pas aan op basis van calibratieadvies
+const FORECAST_CORRECTIE = 1.2; // Schaalfactor voor prognose — pas aan op basis van calibratieadvies
 
 const DEVICE_NAME = 'Zonnepanelen';
 
@@ -93,45 +93,50 @@ const data = await res.json();
 const forecastDay = round((data.result.watt_hours_day?.[todayStr] ?? 0) / 1000, 2);
 const forecastCorrected = round(forecastDay * FORECAST_CORRECTIE, 2);
 const ratio = forecastCorrected > 0 ? round(actualKwh / forecastCorrected, 3) : null;
+// Correctie die vandaag precies de werkelijke opbrengst had opgeleverd — onafhankelijk van de huidige FORECAST_CORRECTIE
+const impliedCorrectie = forecastDay > 0 ? round(actualKwh / forecastDay, 3) : null;
 
 // --------------------------
 // TILT kalibratie (EMA)
-// Op heldere dagen bijwerken: werkelijk ÷ prognose nadert 1.0 als TILT klopt
+// Op heldere dagen bijwerken: gemiddelde geïmpliceerde correctie nadert de ingestelde FORECAST_CORRECTIE als TILT klopt
 // --------------------------
 
-let emaRatio = await getLogicNumber('solar_tilt_ema_ratio', ratio ?? 1);
+let emaCorrectie = await getLogicNumber('solar_tilt_ema_correctie', impliedCorrectie ?? FORECAST_CORRECTIE);
 let calibDays = await getLogicNumber('solar_tilt_calibration_days', 0);
 let tiltAdvice = null;
 let islearningDay = false;
 
-// Auto-reset als TILT of FORECAST_CORRECTIE is aangepast
+// Auto-reset alleen als TILT, AZIMUTH of KWP is aangepast — die veranderen de ruwe prognosebasis.
+// FORECAST_CORRECTIE zelf triggert geen reset meer: emaCorrectie is er onafhankelijk van.
 const lastTilt = await getLogicNumber('solar_last_tilt', TILT);
-const lastCorrectie = await getLogicNumber('solar_last_correctie', FORECAST_CORRECTIE);
-if (lastTilt !== TILT || lastCorrectie !== FORECAST_CORRECTIE) {
-  emaRatio = ratio ?? 1;
+const lastAzimuth = await getLogicNumber('solar_last_azimuth', AZIMUTH);
+const lastKwp = await getLogicNumber('solar_last_kwp', KWP);
+if (lastTilt !== TILT || lastAzimuth !== AZIMUTH || lastKwp !== KWP) {
+  emaCorrectie = impliedCorrectie ?? FORECAST_CORRECTIE;
   calibDays = 0;
-  await setLogicNumber('solar_tilt_ema_ratio', emaRatio);
+  await setLogicNumber('solar_tilt_ema_correctie', emaCorrectie);
   await setLogicNumber('solar_tilt_calibration_days', calibDays);
   await setLogicNumber('solar_last_tilt', TILT);
-  await setLogicNumber('solar_last_correctie', FORECAST_CORRECTIE);
+  await setLogicNumber('solar_last_azimuth', AZIMUTH);
+  await setLogicNumber('solar_last_kwp', KWP);
 }
 
-if (ratio !== null && ratio >= CLEAR_DAY_THRESHOLD) {
+if (ratio !== null && ratio >= CLEAR_DAY_THRESHOLD && impliedCorrectie !== null) {
   islearningDay = true;
-  emaRatio = round(EMA_ALPHA * ratio + (1 - EMA_ALPHA) * emaRatio, 3);
+  emaCorrectie = round(EMA_ALPHA * impliedCorrectie + (1 - EMA_ALPHA) * emaCorrectie, 3);
   calibDays = calibDays + 1;
 
-  await setLogicNumber('solar_tilt_ema_ratio', emaRatio);
+  await setLogicNumber('solar_tilt_ema_correctie', emaCorrectie);
   await setLogicNumber('solar_tilt_calibration_days', calibDays);
 
   if (calibDays >= 5) {
-    const suggested = round(FORECAST_CORRECTIE * emaRatio, 2);
-    if (emaRatio > 1.07) {
-      tiltAdvice = `Prognose te laag — werkelijk ${Math.round(emaRatio * 100)}% van gecorrigeerde prognose. Verhoog FORECAST_CORRECTIE van ${FORECAST_CORRECTIE} naar ~${suggested}.`;
-    } else if (emaRatio < 0.93) {
-      tiltAdvice = `Prognose te hoog of verliezen aanwezig — werkelijk ${Math.round(emaRatio * 100)}% van gecorrigeerde prognose. Verlaag FORECAST_CORRECTIE van ${FORECAST_CORRECTIE} naar ~${suggested}.`;
+    const suggested = round(emaCorrectie, 2);
+    if (suggested > FORECAST_CORRECTIE * 1.07) {
+      tiltAdvice = `Prognose te laag — gemiddeld geïmpliceerde correctie ${suggested} over ${calibDays} heldere dagen. Verhoog FORECAST_CORRECTIE van ${FORECAST_CORRECTIE} naar ~${suggested}.`;
+    } else if (suggested < FORECAST_CORRECTIE * 0.93) {
+      tiltAdvice = `Prognose te hoog of verliezen aanwezig — gemiddeld geïmpliceerde correctie ${suggested} over ${calibDays} heldere dagen. Verlaag FORECAST_CORRECTIE van ${FORECAST_CORRECTIE} naar ~${suggested}.`;
     } else {
-      tiltAdvice = `Prognose klopt goed (FORECAST_CORRECTIE=${FORECAST_CORRECTIE}) — gemiddeld ${Math.round(emaRatio * 100)}% over ${calibDays} heldere dagen.`;
+      tiltAdvice = `Prognose klopt goed (FORECAST_CORRECTIE=${FORECAST_CORRECTIE}) — gemiddeld geïmpliceerde correctie ${suggested} over ${calibDays} heldere dagen.`;
     }
   }
 }
@@ -151,7 +156,8 @@ return {
   forecastDayKwh: forecastDay,
   forecastCorrectedKwh: forecastCorrected,
   ratio,
-  emaRatio,
+  impliedCorrectie,
+  emaCorrectie,
   calibrationDays: calibDays,
   isLearningDay: islearningDay,
   tiltAdvice,

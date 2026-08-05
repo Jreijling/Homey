@@ -8,7 +8,7 @@ const LON = 4.7974;
 const TILT = 15;
 const KWP = 8.8;
 const AZIMUTH = -30;
-const FORECAST_CORRECTIE = 1.66; // Schaalfactor voor prognose — pas aan op basis van calibratieadvies
+const FORECAST_CORRECTIE = 1.2; // Schaalfactor voor prognose — pas aan op basis van calibratieadvies
 
 const VARIABLE_NAME = "solar_forecast"; // rollend venster komende 3 uur
 const DAG_VARIABLE_NAME = "solar_forecast_dag"; // totale verwachte opbrengst hele kalenderdag
@@ -175,6 +175,7 @@ return {
   solarForecastKwhDag: solarForecastDag,
   timelineSent,
   timelineText,
+  localHour: localNow.getUTCHours(),
   lat: LAT,
   lon: LON,
   tilt: TILT,
