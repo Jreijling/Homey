@@ -123,6 +123,9 @@ class AnkerSolixApp extends Homey.App {
           device.bat_discharge_power = String(snapshot.bat_discharge_power);
           device.output_power        = String(snapshot.output_power);
           device.battery_power       = String(snapshot.battery_power);
+          device.rated_energy_kwh        = snapshot.rated_energy_kwh;
+          device.cumulative_charge_kwh   = snapshot.cumulative_charge_kwh;
+          device.cumulative_discharge_kwh = snapshot.cumulative_discharge_kwh;
         }
         if (sceneData?.solarbank_info) {
           sceneData.solarbank_info.total_photovoltaic_power = String(snapshot.photovoltaic_power);

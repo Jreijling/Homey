@@ -1,6 +1,6 @@
 {
   "id": "com.anker.solix",
-  "version": "1.0.10",
+  "version": "1.0.13",
   "compatibility": ">=12.0.0",
   "sdk": 3,
   "platforms": ["local", "cloud"],
@@ -173,6 +173,9 @@
       "platforms": ["local", "cloud"],
       "capabilities": [
         "measure_battery",
+        "measure_power",
+        "meter_power.charged",
+        "meter_power.discharged",
         "solar_power",
         "battery_charge_power",
         "battery_discharge_power",
@@ -184,10 +187,21 @@
       "capabilitiesOptions": {
         "measure_battery": {
           "title": { "en": "Battery SOC", "nl": "Batterijlading" }
+        },
+        "measure_power": {
+          "title": { "en": "Battery Power", "nl": "Batterijvermogen" }
+        },
+        "meter_power.charged": {
+          "title": { "en": "Total Charged", "nl": "Totaal geladen" }
+        },
+        "meter_power.discharged": {
+          "title": { "en": "Total Discharged", "nl": "Totaal ontladen" }
         }
       },
       "energy": {
-        "batteries": ["INTERNAL"]
+        "homeBattery": true,
+        "meterPowerImportedCapability": "meter_power.charged",
+        "meterPowerExportedCapability": "meter_power.discharged"
       },
       "images": {
         "small": "/drivers/solarbank/assets/images/small.png",

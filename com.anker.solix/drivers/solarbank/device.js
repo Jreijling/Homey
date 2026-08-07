@@ -12,6 +12,13 @@ class SolarbankDevice extends Homey.Device {
     this._siteId   = this.getStoreValue('site_id');
     this._deviceSn = this.getStoreValue('device_sn');
 
+    // Devices paired before these capabilities were added need them added explicitly.
+    for (const cap of ['measure_power', 'meter_power.charged', 'meter_power.discharged']) {
+      if (!this.hasCapability(cap)) {
+        await this.addCapability(cap).catch(err => this.error(`addCapability ${cap}:`, err.message));
+      }
+    }
+
     // State for flow triggers
     this._wasCharging    = false;
     this._wasDischarging = false;
@@ -57,6 +64,14 @@ class SolarbankDevice extends Homey.Device {
       if (device.set_load_power !== '') {
         this._set('output_preset_power', p(device.set_load_power));
       }
+
+      // Only populated when reading over local Modbus TCP.
+      if (device.cumulative_charge_kwh != null) {
+        this._set('meter_power.charged', device.cumulative_charge_kwh);
+      }
+      if (device.cumulative_discharge_kwh != null) {
+        this._set('meter_power.discharged', device.cumulative_discharge_kwh);
+      }
     }
 
     // ── Site-level values from solarbank_info ──
@@ -65,6 +80,9 @@ class SolarbankDevice extends Homey.Device {
     // ── Flow trigger logic ──
     const chargePower    = p(device?.bat_charge_power ?? device?.charging_power);
     const dischargePower = p(device?.bat_discharge_power ?? sbInfo.battery_discharge_power);
+
+    // Homey Energy convention: positive = charging (consuming), negative = discharging.
+    this._set('measure_power', chargePower - dischargePower);
 
     const isCharging    = chargePower    > 0;
     const isDischarging = dischargePower > 0;
