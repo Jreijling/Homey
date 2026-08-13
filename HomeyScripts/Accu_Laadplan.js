@@ -7,8 +7,10 @@
 // Werking (elke run herberekend, geen eenmalig ochtendplan):
 // 1. tekort = min(resterende ruimte in accu, 14 kWh - (zon-forecast x 0.85))
 // 2. blokken nodig = tekort / (maxLaadvermogen x kwartier), afgerond naar boven
-// 3. as het huidige kwartierblok bij de N goedkoopste van vandaag hoort ->
-//    zet grid_charge_power op maxLaadvermogen, anders op 0
+// 3. als het huidige kwartierblok bij de N goedkoopste van vandaag hoort ÉN er
+//    nu geen zon beschikbaar is -> zet grid_charge_power op maxLaadvermogen,
+//    anders op 0. Zon heeft dus altijd voorrang via de normale zelfconsumptie-
+//    modus van het apparaat; dit script grijpt alleen in als er geen zon is.
 //
 // Vereist: Anker Solix app in Modbus-modus (grid_charge_power werkt niet via cloud).
 //
@@ -25,6 +27,7 @@ const config = {
   blokMinuten:              15,
   blokkenPerDag:            96,
   minTekortKwh:             0.2, // kleiner tekort dan dit: niet de moeite
+  zonAanwezigDrempelWatt:   100, // boven dit vermogen: zon regelt het zelf, niet ingrijpen
 
   solarForecastDagVariabele: 'solar_forecast_dag',
 
@@ -93,6 +96,8 @@ const soc = Number(accu.capabilitiesObj?.measure_battery?.value);
 if (!Number.isFinite(soc)) throw new Error("Ongeldige 'measure_battery' op Accu");
 
 const huidigLaadvermogen = Number(accu.capabilitiesObj?.grid_charge_power?.value) || 0;
+const huidigZonvermogen  = Number(accu.capabilitiesObj?.solar_power?.value) || 0;
+const zonBeschikbaar     = huidigZonvermogen > config.zonAanwezigDrempelWatt;
 
 const prijsRang = Number(dap.capabilitiesObj?.meter_rank_price_h0_this_day?.value);
 if (!Number.isFinite(prijsRang)) throw new Error("Ongeldige 'meter_rank_price_h0_this_day' op DAP-apparaat");
@@ -119,13 +124,15 @@ const blokkenNodig = heeftTekort
   : 0;
 
 const isGoedkoopGenoeg = heeftTekort && prijsRang <= blokkenNodig;
-const gewenstVermogen = isGoedkoopGenoeg ? config.maxLaadvermogenWatt : 0;
+const magNetLaden = isGoedkoopGenoeg && !zonBeschikbaar;
+const gewenstVermogen = magNetLaden ? config.maxLaadvermogenWatt : 0;
 
 logLine(
   `soc=${soc}% (${afronding(huidigeKwh)} kWh) | ruimte=${afronding(resterendeRuimteKwh)} kWh | ` +
   `zonForecast=${afronding(solarForecastDag)} kWh (effectief ${afronding(effectieveZonKwh)}) | ` +
   `tekort=${afronding(tekortKwh)} kWh | blokkenNodig=${blokkenNodig}/${config.blokkenPerDag} | ` +
   `prijsRang=#${prijsRang} (${afronding(huidigePrijs, 4)}) | goedkoopGenoeg=${isGoedkoopGenoeg} | ` +
+  `zonNu=${huidigZonvermogen}W (beschikbaar=${zonBeschikbaar}) | magNetLaden=${magNetLaden} | ` +
   `huidig=${huidigLaadvermogen}W -> gewenst=${gewenstVermogen}W`
 );
 
@@ -148,9 +155,12 @@ let message;
 if (!heeftTekort) {
   state = 'geen-tekort';
   message = `Accu: geen netlaadtekort (zon dekt naar verwachting ${afronding(effectieveZonKwh)} kWh)`;
-} else if (isGoedkoopGenoeg) {
+} else if (magNetLaden) {
   state = `laden-${blokkenNodig}`;
   message = `Accu laadt vanaf net: ${gewenstVermogen}W (prijsrang #${prijsRang}, tekort ${afronding(tekortKwh)} kWh, ${blokkenNodig} blokken nodig)`;
+} else if (isGoedkoopGenoeg && zonBeschikbaar) {
+  state = `zon-heeft-voorrang-${blokkenNodig}`;
+  message = `Accu: goedkoop moment maar zon (${huidigZonvermogen}W) regelt het laden al zelf`;
 } else {
   state = `wachten-${blokkenNodig}`;
   message = `Accu wacht op goedkoper moment (prijsrang #${prijsRang} > ${blokkenNodig} benodigde blokken, tekort ${afronding(tekortKwh)} kWh)`;
@@ -172,6 +182,9 @@ return {
   prijsRang,
   huidigePrijs,
   isGoedkoopGenoeg,
+  huidigZonvermogen,
+  zonBeschikbaar,
+  magNetLaden,
   huidigLaadvermogen,
   gewenstVermogen,
   gewijzigd,
