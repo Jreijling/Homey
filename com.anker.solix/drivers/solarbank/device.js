@@ -1,6 +1,7 @@
 'use strict';
 
 const Homey = require('homey');
+const { setGridChargePower, stopGridCharge } = require('../../lib/AnkerSolixModbusReader');
 
 const p = v => parseFloat(v) || 0;
 
@@ -13,7 +14,7 @@ class SolarbankDevice extends Homey.Device {
     this._deviceSn = this.getStoreValue('device_sn');
 
     // Devices paired before these capabilities were added need them added explicitly.
-    for (const cap of ['measure_power', 'meter_power.charged', 'meter_power.discharged']) {
+    for (const cap of ['measure_power', 'meter_power.charged', 'meter_power.discharged', 'grid_charge_power']) {
       if (!this.hasCapability(cap)) {
         await this.addCapability(cap).catch(err => this.error(`addCapability ${cap}:`, err.message));
       }
@@ -27,6 +28,7 @@ class SolarbankDevice extends Homey.Device {
     this.registerCapabilityListener('output_preset_power', v => this.setOutputPreset(v));
     this.registerCapabilityListener('battery_min_soc',     v => this._setMinSoc(v));
     this.registerCapabilityListener('grid_export_enabled', v => this.setGridExport(v));
+    this.registerCapabilityListener('grid_charge_power',   v => this.setGridChargePower(v));
 
     // Subscribe to poll results
     this._onUpdate = this._onUpdate.bind(this);
@@ -124,6 +126,29 @@ class SolarbankDevice extends Homey.Device {
     await api.setDeviceAttrs(this._deviceSn, { switch_0w: enabled ? 0 : 1 });
     this._set('grid_export_enabled', enabled);
     await this.homey.app.refreshNow();
+  }
+
+  /**
+   * Forces grid charging via local Modbus TCP third-party control. Requires
+   * Modbus mode to be enabled in app settings — there is no cloud equivalent.
+   * Setting 0W returns the device to normal self-consumption behaviour.
+   */
+  async setGridChargePower(watts) {
+    if (this.homey.settings.get('connection_mode') !== 'modbus') {
+      throw new Error('Grid charge control requires Modbus mode (see app settings)');
+    }
+
+    const host = this.homey.settings.get('modbus_ip');
+    const port = Number(this.homey.settings.get('modbus_port')) || 502;
+    if (!host) throw new Error('No Modbus IP configured in app settings');
+
+    if (watts > 0) {
+      await setGridChargePower({ host, port, watts });
+    } else {
+      await stopGridCharge({ host, port });
+    }
+
+    this._set('grid_charge_power', watts);
   }
 
   async _setMinSoc(percent) {

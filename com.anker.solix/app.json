@@ -1,6 +1,6 @@
 {
   "id": "com.anker.solix",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "compatibility": ">=12.0.0",
   "sdk": 3,
   "platforms": ["local", "cloud"],
@@ -84,6 +84,20 @@
       "decimals": 0,
       "uiComponent": "sensor",
       "icon": "/assets/capabilities/ac_output_power.svg"
+    },
+    "grid_charge_power": {
+      "type": "number",
+      "title": { "en": "Grid Charge Power", "nl": "Netlaadvermogen" },
+      "units": "W",
+      "getable": true,
+      "setable": true,
+      "insights": true,
+      "min": 0,
+      "max": 3500,
+      "step": 50,
+      "decimals": 0,
+      "uiComponent": "slider",
+      "icon": "/assets/capabilities/battery_charge_power.svg"
     },
     "output_preset_power": {
       "type": "number",
@@ -180,6 +194,7 @@
         "battery_charge_power",
         "battery_discharge_power",
         "ac_output_power",
+        "grid_charge_power",
         "output_preset_power",
         "battery_min_soc",
         "grid_export_enabled"

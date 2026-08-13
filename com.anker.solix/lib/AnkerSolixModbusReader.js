@@ -1,6 +1,6 @@
 'use strict';
 
-const { ModbusClient, toInt32, toUint32 } = require('./ModbusClient');
+const { ModbusClient, toInt32, toUint32, fromInt32 } = require('./ModbusClient');
 
 // Register map for Anker SOLIX Solarbank Max AC (product code DMWH/DMXU/E25H),
 // taken from Anker's official Home Assistant integration
@@ -60,4 +60,43 @@ async function readModbusSnapshot({ host, port = 502 }) {
   }
 }
 
-module.exports = { readModbusSnapshot };
+// Write-side registers for third-party control (see Anker's official
+// register map — write_quantities.operating_mode and
+// control_items.battery_power_setpoint / write_quantities.battery_power_direction,
+// which both target the same physical register: sign = direction, magnitude = watts).
+const REG_OPERATING_MODE          = 10064;
+const REG_BATTERY_POWER_SETPOINT  = 10071;
+const OPERATING_MODE_SELF_CONSUMPTION = 0;
+const OPERATING_MODE_THIRD_PARTY_CONTROL = 3;
+
+/**
+ * Forces the battery to charge from the grid at the given wattage by
+ * switching to third-party-control mode and writing a negative power
+ * setpoint (negative = charge, mirroring the read-side sign convention
+ * for register 10008).
+ */
+async function setGridChargePower({ host, port = 502, watts }) {
+  const client = new ModbusClient({ host, port });
+  try {
+    await client.writeSingleRegister(REG_OPERATING_MODE, OPERATING_MODE_THIRD_PARTY_CONTROL);
+    await client.writeMultipleRegisters(REG_BATTERY_POWER_SETPOINT, fromInt32(-Math.abs(watts)));
+  } finally {
+    client.close();
+  }
+}
+
+/**
+ * Clears any third-party power setpoint and returns the device to normal
+ * self-consumption behaviour.
+ */
+async function stopGridCharge({ host, port = 502 }) {
+  const client = new ModbusClient({ host, port });
+  try {
+    await client.writeMultipleRegisters(REG_BATTERY_POWER_SETPOINT, fromInt32(0));
+    await client.writeSingleRegister(REG_OPERATING_MODE, OPERATING_MODE_SELF_CONSUMPTION);
+  } finally {
+    client.close();
+  }
+}
+
+module.exports = { readModbusSnapshot, setGridChargePower, stopGridCharge };

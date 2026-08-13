@@ -186,4 +186,11 @@ function toInt32(registers) {
   return unsigned & 0x80000000 ? unsigned - 0x100000000 : unsigned;
 }
 
-module.exports = { ModbusClient, toUint32, toInt32 };
+// Inverse of toUint32/toInt32 — encodes a (possibly negative) 32-bit value as
+// [hi, lo] registers for a write.
+function fromInt32(value) {
+  const unsigned = value >>> 0; // two's complement wrap for negative inputs
+  return [(unsigned >>> 16) & 0xFFFF, unsigned & 0xFFFF];
+}
+
+module.exports = { ModbusClient, toUint32, toInt32, fromInt32 };
