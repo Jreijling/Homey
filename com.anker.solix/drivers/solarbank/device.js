@@ -1,7 +1,7 @@
 'use strict';
 
 const Homey = require('homey');
-const { setGridChargePower, stopGridCharge } = require('../../lib/AnkerSolixModbusReader');
+const { setGridChargePower, stopGridCharge, holdBatteryAtZero } = require('../../lib/AnkerSolixModbusReader');
 
 const p = v => parseFloat(v) || 0;
 
@@ -14,7 +14,7 @@ class SolarbankDevice extends Homey.Device {
     this._deviceSn = this.getStoreValue('device_sn');
 
     // Devices paired before these capabilities were added need them added explicitly.
-    for (const cap of ['measure_power', 'meter_power.charged', 'meter_power.discharged', 'grid_charge_power', 'grid_export_limit', 'ac_input_limit']) {
+    for (const cap of ['measure_power', 'meter_power.charged', 'meter_power.discharged', 'grid_charge_power', 'grid_export_limit', 'ac_input_limit', 'battery_hold']) {
       if (!this.hasCapability(cap)) {
         await this.addCapability(cap).catch(err => this.error(`addCapability ${cap}:`, err.message));
       }
@@ -29,6 +29,7 @@ class SolarbankDevice extends Homey.Device {
     this.registerCapabilityListener('battery_min_soc',     v => this._setMinSoc(v));
     this.registerCapabilityListener('grid_export_enabled', v => this.setGridExport(v));
     this.registerCapabilityListener('grid_charge_power',   v => this.setGridChargePower(v));
+    this.registerCapabilityListener('battery_hold',        v => this.setBatteryHold(v));
     this.registerCapabilityListener('grid_export_limit',   v => this.setGridExportLimit(v));
     this.registerCapabilityListener('ac_input_limit',      v => this.setAcInputLimit(v));
 
@@ -151,6 +152,31 @@ class SolarbankDevice extends Homey.Device {
     }
 
     this._set('grid_charge_power', watts);
+  }
+
+  /**
+   * Holds the battery at 0W (neither charging nor discharging) by staying in
+   * third-party-control mode with a 0 setpoint, instead of reverting fully to
+   * self-consumption. Used to stop solar surplus from charging the battery
+   * (e.g. during expensive price hours), letting it flow to the grid instead.
+   * Disabling returns the device to normal self-consumption behaviour.
+   */
+  async setBatteryHold(enabled) {
+    if (this.homey.settings.get('connection_mode') !== 'modbus') {
+      throw new Error('Battery hold requires Modbus mode (see app settings)');
+    }
+
+    const host = this.homey.settings.get('modbus_ip');
+    const port = Number(this.homey.settings.get('modbus_port')) || 502;
+    if (!host) throw new Error('No Modbus IP configured in app settings');
+
+    if (enabled) {
+      await holdBatteryAtZero({ host, port });
+    } else {
+      await stopGridCharge({ host, port });
+    }
+
+    this._set('battery_hold', enabled);
   }
 
   /**

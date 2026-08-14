@@ -8,7 +8,7 @@
 // ---------- Apparaat IDs ----------
 const THERMOSTAAT_ID = '295b3cbb-2cc4-4e4d-9996-294cdf6b2cd0';
 const P1_APPARAAT_ID = '3755a652-027b-41bb-b188-ab2ac592ee04';
-const DYNAMISCHE_ENERGIE_PRIJS_ID = '258709da-1343-4210-95ec-4efa45e354b0'; // Power by the Hour: NL_15Minutes (Frank Energie opslag)
+const DYNAMISCHE_ENERGIE_PRIJS_ID = 'adc99ffc-add2-40d0-b664-8ce3b19c28af'; // Power by the Hour: NL_Netherlands (Frank Energie opslag)
 
 // ---------- Setpoints (vloerverwarming - Verwarming) ----------
 const SETPOINT_VAKANTIE = 18.0;
@@ -35,6 +35,9 @@ const SURPLUS_OVERSCHOT_WATT = -1000;    // Extra overschot beschikbaar voor The
 const GOEDKOOPSTE_UREN_AANTAL = 10;
 const DUURSTE_UREN_AANTAL = 8;
 const BLOKKEN_PER_DAG = 96;
+
+// All-in prijs komt uit de gedeelde logica-variabele 'electra_prijs' (berekend door Electra_Prijs.js)
+const PRIJS_VARIABELE = 'electra_prijs';
 
 // ---------- Logging ----------
 const LOG_MAX_REGELS = 40;
@@ -207,27 +210,21 @@ try {
   aanwezigheidsBron = 'users_api_fout: ' + e.message;
 }
 
-// ---------- Prijzen via DEP-apparaat ----------
+// ---------- Prijzen via DEP-apparaat + gedeelde all-in-prijsvariabele ----------
 const depCapaciteiten = dap.capabilitiesObj || {};
-
-if (!depCapaciteiten.meter_price_h0 || depCapaciteiten.meter_price_h0.value == null) {
-  throw new Error('DEP capaciteit meter_price_h0 niet gevonden of leeg');
-}
 
 if (!depCapaciteiten.meter_rank_price_h0_this_day || depCapaciteiten.meter_rank_price_h0_this_day.value == null) {
   throw new Error('DEP capaciteit meter_rank_price_h0_this_day niet gevonden of leeg');
 }
 
-const huidigePrijs = Number(depCapaciteiten.meter_price_h0.value);
 const huidigePrijsRang = Number(depCapaciteiten.meter_rank_price_h0_this_day.value);
-
-if (!Number.isFinite(huidigePrijs)) {
-  throw new Error('Ongeldige huidige prijs uit DEP-apparaat');
-}
 
 if (!Number.isFinite(huidigePrijsRang)) {
   throw new Error('Ongeldige prijsrang uit DEP-apparaat');
 }
+
+// All-in prijs komt uit de gedeelde variabele (berekend door Electra_Prijs.js)
+const huidigePrijs = await haalVariabele(PRIJS_VARIABELE, 0);
 
 // BELANGRIJK:
 // rang 1 = goedkoopste blok, rang schaalt over 96 kwartierblokken/dag

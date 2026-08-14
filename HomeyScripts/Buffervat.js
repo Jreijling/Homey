@@ -13,7 +13,7 @@
 // ---------- Apparaat IDs ----------
 const P1_APPARAAT_ID = '3755a652-027b-41bb-b188-ab2ac592ee04';
 const WARMTEPOMP_ID = 'd9a883d7-6322-4b73-820d-cd259bde862c';
-const DYNAMISCHE_ENERGIE_PRIJS_ID = '258709da-1343-4210-95ec-4efa45e354b0'; // Power by the Hour: NL_15Minutes (Frank Energie opslag)
+const DYNAMISCHE_ENERGIE_PRIJS_ID = 'adc99ffc-add2-40d0-b664-8ce3b19c28af'; // Power by the Hour: NL_Netherlands (Frank Energie opslag)
 
 // ---------- Instellingen warmtepomp doeltemperaturen ----------
 const VAKANTIE_TEMPERATUUR = 45;
@@ -29,15 +29,13 @@ const ZONNE_BOOST_UIT_WATT = -500;    // boost UITSCHAKELEN
 // ---------- Prijs instellingen ----------
 // meter_rank_price_h0_this_day rangschikt op kwartierblokken (96/dag ipv 24 uren),
 // dus "aantal uren" wordt hieronder omgerekend naar blokken (x4).
-const GOEDKOOPSTE_UREN_AANTAL = 10;
+const GOEDKOOPSTE_UREN_AANTAL = 6;
 const DUURSTE_UREN_AANTAL = 8;
 const BLOKKEN_PER_DAG = 96;
 const SOLAR_FORECAST_SKIP_BOOST_KWH = 3;
 
-// ---------- All-in prijs (voor negatieve-prijs-detectie) ----------
-// meter_price_h0 bevat kale EPEX + Frank Energie opslag, exclusief energiebelasting/BTW.
-const ENERGIEBELASTING_PER_KWH = 0.0916; // excl. BTW, overheidstarief 2026
-const BTW_FACTOR = 1.21;
+// ---------- All-in prijs ----------
+// Komt uit de gedeelde logica-variabele 'electra_prijs' (berekend door Electra_Prijs.js).
 
 // ---------- Logging ----------
 const LOG_MAX_REGELS = 40;
@@ -264,24 +262,15 @@ const buitentemp = await haalVariabele('Buitentemperatuur', 10);
 const solarForecast = await haalVariabele('solar_forecast', 0);
 
 // --------------------------
-// Prijzen via DAP-apparaat
+// Prijzen via DAP-apparaat + gedeelde all-in-prijsvariabele
 // --------------------------
 const dapCapaciteiten = dap.capabilitiesObj || {};
-
-if (!dapCapaciteiten.meter_price_h0 || dapCapaciteiten.meter_price_h0.value == null) {
-  throw new Error('DAP capaciteit meter_price_h0 niet gevonden of leeg');
-}
 
 if (!dapCapaciteiten.meter_rank_price_h0_this_day || dapCapaciteiten.meter_rank_price_h0_this_day.value == null) {
   throw new Error('DAP capaciteit meter_rank_price_h0_this_day niet gevonden of leeg');
 }
 
-const huidigePrijs = Number(dapCapaciteiten.meter_price_h0.value);
 const huidigePrijsRang = Number(dapCapaciteiten.meter_rank_price_h0_this_day.value);
-
-if (!Number.isFinite(huidigePrijs)) {
-  throw new Error('Ongeldige huidige prijs uit DAP-apparaat');
-}
 
 if (!Number.isFinite(huidigePrijsRang)) {
   throw new Error('Ongeldige prijsrang uit DAP-apparaat');
@@ -291,8 +280,8 @@ if (!Number.isFinite(huidigePrijsRang)) {
 const isGoedkoopUur = huidigePrijsRang <= (GOEDKOOPSTE_UREN_AANTAL * 4);
 const isDuurUur = huidigePrijsRang > (BLOKKEN_PER_DAG - (DUURSTE_UREN_AANTAL * 4));
 
-// All-in prijs = kale prijs + energiebelasting, incl. BTW
-const huidigePrijsAllIn = afronding((huidigePrijs + ENERGIEBELASTING_PER_KWH) * BTW_FACTOR, 4);
+// All-in prijs komt uit de gedeelde variabele (berekend door NegatievePrijsMelding.js)
+const huidigePrijsAllIn = await haalVariabele('electra_prijs', 0);
 const isNegatieveAllInPrijs = huidigePrijsAllIn < 0;
 
 // ---------- Vakantie ----------
@@ -340,7 +329,7 @@ let modus = 'NORMAAL';
 let redenen = [];
 let doeltemp = NORMAAL_TEMPERATUUR;
 
-redenen.push('Huidige prijs: ' + afronding(huidigePrijs, 4) + ' (all-in: ' + huidigePrijsAllIn + ')');
+redenen.push('Huidige prijs (all-in): ' + huidigePrijsAllIn);
 redenen.push('Prijsrang vandaag: #' + huidigePrijsRang + '/' + BLOKKEN_PER_DAG + ' (1 = goedkoopst)');
 redenen.push('Goedkoop uur: ' + isGoedkoopUur);
 redenen.push('Duur uur: ' + isDuurUur);
@@ -455,7 +444,6 @@ const samenvatting =
   ', uur=' + uur +
   ', opVakantie=' + opVakantie +
   ', netwerk=' + netwerkvermogen +
-  ', huidigePrijs=' + afronding(huidigePrijs, 4) +
   ', huidigePrijsAllIn=' + huidigePrijsAllIn +
   ', rangVandaag=' + huidigePrijsRang + '/' + BLOKKEN_PER_DAG +
   ', isGoedkoopUur=' + isGoedkoopUur +
@@ -489,7 +477,7 @@ if (STUUR_TIJDLIJN_ALTIJD || (STUUR_TIJDLIJN_BIJ_WIJZIGING && (gewijzigd || modu
   const tekst =
     'Warmtepomp ' + modus +
     ': ' + huidigDoeltemperatuur + '->' + doeltemp +
-    ' (uur: ' + uur + ', prijs: ' + afronding(huidigePrijs) + ' rang: ' + huidigePrijsRang + ', netwerk: ' + netwerkvermogen + 'W)';
+    ' (uur: ' + uur + ', prijs: ' + huidigePrijsAllIn + ' rang: ' + huidigePrijsRang + ', netwerk: ' + netwerkvermogen + 'W)';
   tijdlijnVerstuurd = await voegTijdlijnToe(tekst);
 }
 
@@ -501,7 +489,6 @@ return {
   opVakantie: opVakantie,
   uur: uur,
   netwerk: netwerkvermogen,
-  huidigePrijs: huidigePrijs,
   huidigePrijsAllIn: huidigePrijsAllIn,
   rangVandaag: huidigePrijsRang,
   blokkenPerDag: BLOKKEN_PER_DAG,

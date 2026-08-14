@@ -19,7 +19,7 @@
 
 const config = {
   accuDeviceId:            'd0b80416-826c-4db9-9a4e-163796f60d5a', // "Accu"
-  dapDeviceId:              '258709da-1343-4210-95ec-4efa45e354b0', // Power by the Hour: NL_15Minutes
+  dapDeviceId:              'adc99ffc-add2-40d0-b664-8ce3b19c28af', // Power by the Hour: NL_Netherlands
 
   accuCapaciteitKwh:        14,
   maxLaadvermogenWatt:      3500,
@@ -30,6 +30,7 @@ const config = {
   zonAanwezigDrempelWatt:   100, // boven dit vermogen: zon regelt het zelf, niet ingrijpen
 
   solarForecastDagVariabele: 'solar_forecast_dag',
+  prijsVariabele:            'electra_prijs', // all-in prijs, berekend door Electra_Prijs.js
 
   dryRun: false,
   sendTimelineUpdates: true,
@@ -102,9 +103,8 @@ const zonBeschikbaar     = huidigZonvermogen > config.zonAanwezigDrempelWatt;
 const prijsRang = Number(dap.capabilitiesObj?.meter_rank_price_h0_this_day?.value);
 if (!Number.isFinite(prijsRang)) throw new Error("Ongeldige 'meter_rank_price_h0_this_day' op DAP-apparaat");
 
-const huidigePrijs = Number(dap.capabilitiesObj?.meter_price_h0?.value);
-
 const solarForecastDag = await haalLogicaVariabele(config.solarForecastDagVariabele, 0);
+const huidigePrijs = await haalLogicaVariabele(config.prijsVariabele, 0);
 
 // ─── Tekort berekenen ──────────────────────────────────────────────────────────
 

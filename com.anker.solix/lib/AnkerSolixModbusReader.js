@@ -99,4 +99,28 @@ async function stopGridCharge({ host, port = 502 }) {
   }
 }
 
-module.exports = { readModbusSnapshot, setGridChargePower, stopGridCharge };
+/**
+ * Holds the battery at 0W by staying in third-party-control mode with a 0
+ * setpoint, rather than reverting to self-consumption (stopGridCharge).
+ * Unlike self-consumption, this should stop the battery from absorbing
+ * solar surplus or covering load from its own charge — both flow through
+ * the grid connection instead while the hold is active.
+ */
+async function holdBatteryAtZero({ host, port = 502 }) {
+  const client = new ModbusClient({ host, port });
+  try {
+    await client.writeSingleRegister(REG_OPERATING_MODE, OPERATING_MODE_THIRD_PARTY_CONTROL);
+    // A literal 0 setpoint is treated by the firmware as a "no override"
+    // sentinel and falls straight back to self-consumption (verified live:
+    // discharge kept tracking load exactly). A 1W setpoint is honoured as a
+    // real override — verified live to hold discharge at 0W regardless of
+    // load, sustained over a load range of 900W-2800W.
+    await client.writeMultipleRegisters(REG_BATTERY_POWER_SETPOINT, fromInt32(1));
+  } finally {
+    client.close();
+  }
+}
+
+module.exports = {
+  readModbusSnapshot, setGridChargePower, stopGridCharge, holdBatteryAtZero,
+};

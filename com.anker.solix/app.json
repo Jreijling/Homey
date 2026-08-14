@@ -1,6 +1,6 @@
 {
   "id": "com.anker.solix",
-  "version": "1.0.21",
+  "version": "1.0.24",
   "compatibility": ">=12.0.0",
   "sdk": 3,
   "platforms": ["local", "cloud"],
@@ -164,6 +164,15 @@
       "uiComponent": "toggle",
       "icon": "/assets/capabilities/grid_export_enabled.svg"
     },
+    "battery_hold": {
+      "type": "boolean",
+      "title": { "en": "Hold Battery (0W)", "nl": "Accu vasthouden (0W)" },
+      "getable": true,
+      "setable": true,
+      "insights": false,
+      "uiComponent": "toggle",
+      "icon": "/assets/capabilities/grid_export_enabled.svg"
+    },
     "home_load_power": {
       "type": "number",
       "title": { "en": "Home Load", "nl": "Thuisverbruik" },
@@ -227,7 +236,8 @@
         "ac_input_limit",
         "output_preset_power",
         "battery_min_soc",
-        "grid_export_enabled"
+        "grid_export_enabled",
+        "battery_hold"
       ],
       "capabilitiesOptions": {
         "measure_battery": {

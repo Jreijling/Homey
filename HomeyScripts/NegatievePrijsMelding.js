@@ -3,12 +3,17 @@
 // 1. Als de all-in prijs van MORGEN op enig moment negatief is -> eenmalige melding per dag
 // 2. Als de all-in prijs over 15 minuten negatief wordt (en nu nog niet) -> reminder
 //
+// Huidige en volgende all-in prijs komen uit de logica-variabelen
+// 'electra_prijs' / 'electra_prijs_volgende' (berekend door Electra_Prijs.js) -
+// dit script berekent zelf alleen nog de "morgen laagste"-waarde, die daar
+// niet in zit.
+//
 // Bedoeld om elke 15 minuten via een Flow te draaien (tijd-trigger op :00/:15/:30/:45),
 // aansluitend op de kwartierprijzen van het DAP-apparaat.
 // ==========================
 
 // ---------- Apparaat ID ----------
-const DYNAMISCHE_ENERGIE_PRIJS_ID = '258709da-1343-4210-95ec-4efa45e354b0'; // Power by the Hour: NL_15Minutes
+const DYNAMISCHE_ENERGIE_PRIJS_ID = 'adc99ffc-add2-40d0-b664-8ce3b19c28af'; // Power by the Hour: NL_Netherlands
 
 // ---------- All-in prijs (kale prijs + energiebelasting, incl. BTW) ----------
 const ENERGIEBELASTING_PER_KWH = 0.0916; // excl. BTW, overheidstarief 2026
@@ -92,8 +97,12 @@ async function voegTijdlijnToe(tekst) {
 }
 
 // --------------------------
-// Apparaat + prijzen ophalen
+// Prijzen ophalen
 // --------------------------
+const alleInNu = await haalVariabele('electra_prijs', 0);
+const alleInOver15Min = await haalVariabele('electra_prijs_volgende', alleInNu);
+
+// "Morgen laagste" zit niet in de gedeelde variabelen - apart uit het DAP-apparaat.
 const dap = await Homey.devices.getDevice({ id: DYNAMISCHE_ENERGIE_PRIJS_ID });
 const caps = dap.capabilitiesObj || {};
 
@@ -104,20 +113,9 @@ function kaleWaarde(capNaam) {
   return Number.isFinite(waarde) ? waarde : null;
 }
 
-const prijsNu = kaleWaarde('meter_price_h0');
-const prijsOver15Min = kaleWaarde('meter_price_m15');
 const prijsMorgenLaagste = kaleWaarde('meter_price_next_day_lowest');
 const uurMorgenLaagste = kaleWaarde('hour_next_day_lowest');
-
-if (prijsNu == null) {
-  throw new Error('DAP capaciteit meter_price_h0 niet gevonden of leeg');
-}
-
-const alleInNu = alleInPrijs(prijsNu);
-const alleInOver15Min = prijsOver15Min != null ? alleInPrijs(prijsOver15Min) : null;
 const alleInMorgenLaagste = prijsMorgenLaagste != null ? alleInPrijs(prijsMorgenLaagste) : null;
-
-await stelLogicaVariabeleIn('electra_prijs', 'number', alleInNu);
 
 const nu = haalLokaalDatum();
 const vandaag = maakDagSleutel(nu);
@@ -162,9 +160,7 @@ if (alleInOver15Min != null && alleInOver15Min < 0 && alleInNu >= 0) {
 // Resultaat
 // --------------------------
 return {
-  prijsNu: prijsNu,
   alleInNu: alleInNu,
-  prijsOver15Min: prijsOver15Min,
   alleInOver15Min: alleInOver15Min,
   prijsMorgenLaagste: prijsMorgenLaagste,
   alleInMorgenLaagste: alleInMorgenLaagste,
