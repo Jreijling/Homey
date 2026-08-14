@@ -60,7 +60,7 @@ async function sendTimeline(tekst) {
   if (!config.sendTimelineUpdates) return false;
   try {
     await Homey.flow.runFlowCardAction({
-      uri: 'homey:manager:notifications',
+      uri: 'homey:flowcardaction:homey:manager:notifications:create_notification',
       id: 'homey:manager:notifications:create_notification',
       args: { text: tekst }
     });
