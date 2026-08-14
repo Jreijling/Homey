@@ -3,6 +3,7 @@
 const Homey = require('homey');
 const { AnkerSolixApi } = require('./lib/AnkerSolixApi');
 const { readModbusSnapshot } = require('./lib/AnkerSolixModbusReader');
+const AnkerSolixMqtt = require('./lib/AnkerSolixMqtt');
 
 const DEFAULT_POLL_INTERVAL_S = 60;
 const MIN_POLL_INTERVAL_S     = 30;
@@ -191,6 +192,22 @@ class AnkerSolixApp extends Homey.App {
     } catch (err) {
       this.error('Poll error:', err.message);
     }
+  }
+
+  /**
+   * Sets the grid export and AC input power limits via Anker's cloud MQTT
+   * channel (the only way to reach these two settings — not available via
+   * the REST schedule API or local Modbus). Wire format reverse-engineered
+   * from a real command captured from the official Anker app.
+   */
+  async setPowerLimits(devicePn, deviceSn, { gridExportLimitW, acInputLimitW }) {
+    const mqttInfo = await this._api.getMqttInfo();
+    if (!mqttInfo.endpoint_addr) {
+      throw new Error('No MQTT endpoint returned by Anker cloud (getMqttInfo)');
+    }
+    await AnkerSolixMqtt.setPowerLimits({
+      mqttInfo, devicePn, deviceSn, gridExportLimitW, acInputLimitW,
+    });
   }
 
   // ─── Public helpers for drivers/devices ──────────────────────────────────

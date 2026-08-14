@@ -14,7 +14,7 @@ class SolarbankDevice extends Homey.Device {
     this._deviceSn = this.getStoreValue('device_sn');
 
     // Devices paired before these capabilities were added need them added explicitly.
-    for (const cap of ['measure_power', 'meter_power.charged', 'meter_power.discharged', 'grid_charge_power']) {
+    for (const cap of ['measure_power', 'meter_power.charged', 'meter_power.discharged', 'grid_charge_power', 'grid_export_limit', 'ac_input_limit']) {
       if (!this.hasCapability(cap)) {
         await this.addCapability(cap).catch(err => this.error(`addCapability ${cap}:`, err.message));
       }
@@ -29,6 +29,8 @@ class SolarbankDevice extends Homey.Device {
     this.registerCapabilityListener('battery_min_soc',     v => this._setMinSoc(v));
     this.registerCapabilityListener('grid_export_enabled', v => this.setGridExport(v));
     this.registerCapabilityListener('grid_charge_power',   v => this.setGridChargePower(v));
+    this.registerCapabilityListener('grid_export_limit',   v => this.setGridExportLimit(v));
+    this.registerCapabilityListener('ac_input_limit',      v => this.setAcInputLimit(v));
 
     // Subscribe to poll results
     this._onUpdate = this._onUpdate.bind(this);
@@ -149,6 +151,53 @@ class SolarbankDevice extends Homey.Device {
     }
 
     this._set('grid_charge_power', watts);
+  }
+
+  /**
+   * Grid export and AC input power limits share a single physical command
+   * (message type 0080 on Anker's cloud MQTT channel) — both fields must be
+   * sent together, or the unset one would get reset. When the other value
+   * isn't known yet (never read or set), falls back to its capability max,
+   * which matched the device's factory default when this was reverse-engineered.
+   */
+  async _setPowerLimits({ gridExportLimitW, acInputLimitW }) {
+    const devicePn = this.getStoreValue('device_pn');
+    if (!devicePn) throw new Error('No device_pn stored for this device');
+
+    await this.homey.app.setPowerLimits(devicePn, this._deviceSn, { gridExportLimitW, acInputLimitW });
+  }
+
+  _otherLimitOrMax(cap) {
+    // getCapabilityValue() throws rather than returning null for a
+    // capability that has never had a value set (e.g. right after pairing).
+    let value;
+    try {
+      value = this.getCapabilityValue(cap);
+    } catch (err) {
+      value = null;
+    }
+    if (Number.isFinite(value)) return value;
+    try {
+      return this.getCapabilityOptions(cap)?.max ?? 3500;
+    } catch (err) {
+      return 3500;
+    }
+  }
+
+  async setGridExportLimit(watts) {
+    await this._setPowerLimits({
+      gridExportLimitW: watts,
+      acInputLimitW: this._otherLimitOrMax('ac_input_limit'),
+    });
+    this._set('grid_export_limit', watts);
+  }
+
+  async setAcInputLimit(watts) {
+    await this._setPowerLimits({
+      gridExportLimitW: this._otherLimitOrMax('grid_export_limit'),
+      acInputLimitW: watts,
+    });
+    this._set('ac_input_limit', watts);
   }
 
   async _setMinSoc(percent) {

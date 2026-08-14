@@ -30,6 +30,7 @@ const ENDPOINTS = {
   setDeviceAttrs: 'power_service/v1/app/device/set_device_attrs',
   getPowerCutoff: 'power_service/v1/app/compatible/get_power_cutoff',
   setPowerCutoff: 'power_service/v1/app/compatible/set_power_cutoff',
+  getMqttInfo:    'app/devicemanage/get_user_mqtt_info',
 };
 
 // Schedule param types
@@ -252,6 +253,16 @@ class AnkerSolixApi {
       device_sn:  deviceSn,
       cutoff_soc: cutoffSoc,
     });
+  }
+
+  /**
+   * Returns MQTT broker connection info + per-account mTLS client certificates
+   * for Anker's cloud MQTT command channel (used for settings not reachable
+   * via the REST schedule API or local Modbus, e.g. grid export/input limits).
+   */
+  async getMqttInfo() {
+    const r = await this._request(ENDPOINTS.getMqttInfo);
+    return r.data || {};
   }
 
   async getEnergyAnalysis(siteId, deviceSn, type, startTime, endTime) {

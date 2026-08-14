@@ -1,6 +1,6 @@
 {
   "id": "com.anker.solix",
-  "version": "1.0.17",
+  "version": "1.0.21",
   "compatibility": ">=12.0.0",
   "sdk": 3,
   "platforms": ["local", "cloud"],
@@ -99,6 +99,34 @@
       "uiComponent": "slider",
       "icon": "/assets/capabilities/battery_charge_power.svg"
     },
+    "grid_export_limit": {
+      "type": "number",
+      "title": { "en": "Max Grid Export Power", "nl": "Maximaal vermogen naar het net" },
+      "units": "W",
+      "getable": true,
+      "setable": true,
+      "insights": false,
+      "min": 0,
+      "max": 3500,
+      "step": 100,
+      "decimals": 0,
+      "uiComponent": "slider",
+      "icon": "/assets/capabilities/grid_export_power.svg"
+    },
+    "ac_input_limit": {
+      "type": "number",
+      "title": { "en": "Max AC Input Power", "nl": "Maximaal invoervermogen" },
+      "units": "W",
+      "getable": true,
+      "setable": true,
+      "insights": false,
+      "min": 0,
+      "max": 3500,
+      "step": 100,
+      "decimals": 0,
+      "uiComponent": "slider",
+      "icon": "/assets/capabilities/ac_output_power.svg"
+    },
     "output_preset_power": {
       "type": "number",
       "title": { "en": "Output Power Target", "nl": "Uitgangsvermogen doel" },
@@ -195,6 +223,8 @@
         "battery_discharge_power",
         "ac_output_power",
         "grid_charge_power",
+        "grid_export_limit",
+        "ac_input_limit",
         "output_preset_power",
         "battery_min_soc",
         "grid_export_enabled"
