@@ -7,6 +7,18 @@
 // 4. Zonne-overschot ÉN 10 goedkoopste uren tegelijk -> BOOST 56°C
 // 5. Alleen 10 goedkoopste uren (geen zon) -> BOOST 52°C
 // 6. Anders (incl. zon zonder goedkoop uur) -> NORMAAL (zon gaat terug het net op)
+//
+// Zonne-overschot wordt gedetecteerd via de P1 (netto export) ÉN via het
+// live zonvermogen van de Accu (Solarbank). De Accu vangt zon namelijk eerst
+// op voordat er iets bij de P1-meter zichtbaar wordt, dus met alleen P1 zou
+// Buffervat pas boosten als de Accu al (bijna) vol is. Met het Accu-signaal
+// erbij mag Buffervat ook al meeboosten terwijl de Accu nog laadt.
+//
+// Zowel de dagforecast ("Prognose deze dag") als de rollende 3-uursforecast
+// komen van het Power by the Hour-device Zonnepanelen_Σsolar (capabilities
+// meter_kwh_forecast.this_day resp. measure_watt_forecast.*) — geen
+// afhankelijkheid meer van het eigen forecast.solar-script (Solar_Forecast.js
+// is verwijderd).
 // Met logging + redenen + optionele Timeline
 // ==========================
 
@@ -14,6 +26,8 @@
 const P1_APPARAAT_ID = '3755a652-027b-41bb-b188-ab2ac592ee04';
 const WARMTEPOMP_ID = 'd9a883d7-6322-4b73-820d-cd259bde862c';
 const DYNAMISCHE_ENERGIE_PRIJS_ID = 'adc99ffc-add2-40d0-b664-8ce3b19c28af'; // Power by the Hour: NL_Netherlands (Frank Energie opslag)
+const ACCU_APPARAAT_ID = 'd0b80416-826c-4db9-9a4e-163796f60d5a'; // Solarbank ("Accu")
+const ZON_FORECAST_APPARAAT_ID = '865bc38a-e913-4771-aec7-b6bc7ab46b6a'; // Zonnepanelen_Σsolar (Power by the Hour) — "Prognose deze dag"
 
 // ---------- Instellingen warmtepomp doeltemperaturen ----------
 const VAKANTIE_TEMPERATUUR = 45;
@@ -23,8 +37,16 @@ const BOOST_TEMPERATUUR_ZONNE = 56;
 const BOOST_TEMPERATUUR_STANDAARD = 52;
 
 // ---------- Drempels zonne-overschot met hysterese ----------
-const ZONNE_BOOST_AAN_WATT = -2500;   // boost INSCHAKELEN
-const ZONNE_BOOST_UIT_WATT = -500;    // boost UITSCHAKELEN
+const ZONNE_BOOST_AAN_WATT = -2500;   // boost INSCHAKELEN (P1 netto export)
+const ZONNE_BOOST_UIT_WATT = -500;    // boost UITSCHAKELEN (P1 netto export)
+
+// Live zonvermogen dat de Accu (Solarbank) zelf rapporteert. Dit signaal
+// reageert eerder dan P1, omdat de Accu zon eerst zelf opvangt/laadt
+// voordat er iets exporteert. Combinatie met P1 is een OR/OR-hysterese:
+// AAN zodra één van de twee signalen genoeg overschot ziet, UIT pas als
+// beide signalen weer laag genoeg zijn.
+const ACCU_ZON_AAN_WATT = 3000;       // boost INSCHAKELEN (Accu solar_power)
+const ACCU_ZON_UIT_WATT = 1000;       // boost UITSCHAKELEN (Accu solar_power)
 
 // ---------- Prijs instellingen ----------
 // meter_rank_price_h0_this_day rangschikt op kwartierblokken (96/dag ipv 24 uren),
@@ -32,7 +54,8 @@ const ZONNE_BOOST_UIT_WATT = -500;    // boost UITSCHAKELEN
 const GOEDKOOPSTE_UREN_AANTAL = 6;
 const DUURSTE_UREN_AANTAL = 8;
 const BLOKKEN_PER_DAG = 96;
-const SOLAR_FORECAST_SKIP_BOOST_KWH = 3;
+const SOLAR_FORECAST_SKIP_BOOST_KWH = 3; // rollende 3-uursforecast, drempel om zonne-boost vrij te geven
+const SOLAR_FORECAST_DAG_SKIP_BOOST_KWH = 10; // alternatief: "Prognose deze dag" al ruim genoeg, ook als de 3-uursforecast nog laag is
 
 // ---------- All-in prijs ----------
 // Komt uit de gedeelde logica-variabele 'electra_prijs' (berekend door Electra_Prijs.js).
@@ -122,6 +145,30 @@ function bepaalWarmtepompTemperatuurInfo(capabilitiesObj) {
     gemetenTemperatuurCapability: gevondenVoorkeur ? gevondenVoorkeur.naam : 'onbekend',
     temperatuurDebugLijst: debugTemperaturen.length ? debugTemperaturen.join(',') : 'geen'
   };
+}
+
+// Power by the Hour geeft Watt-forecastpunten op vaste momenten
+// (nu, +15/30/45 min, +1u/2u/3u). Trapezium-integratie daarvan geeft een
+// schatting van de opbrengst (kWh) in de komende 3 uur.
+function bepaalZonForecastKwh3Uur(capabilitiesObj) {
+  const punten = [
+    { uur: 0, watt: Number(capabilitiesObj['measure_watt_forecast.h0']?.value) },
+    { uur: 0.25, watt: Number(capabilitiesObj['measure_watt_forecast.m15']?.value) },
+    { uur: 0.5, watt: Number(capabilitiesObj['measure_watt_forecast.m30']?.value) },
+    { uur: 0.75, watt: Number(capabilitiesObj['measure_watt_forecast.m45']?.value) },
+    { uur: 1, watt: Number(capabilitiesObj['measure_watt_forecast.h1']?.value) },
+    { uur: 2, watt: Number(capabilitiesObj['measure_watt_forecast.h2']?.value) },
+    { uur: 3, watt: Number(capabilitiesObj['measure_watt_forecast.h3']?.value) }
+  ].filter(function(p) { return Number.isFinite(p.watt); });
+
+  let kwh = 0;
+  for (let i = 1; i < punten.length; i++) {
+    const duurUur = punten[i].uur - punten[i - 1].uur;
+    const gemiddeldWatt = (punten[i].watt + punten[i - 1].watt) / 2;
+    kwh += (gemiddeldWatt * duurUur) / 1000;
+  }
+
+  return kwh;
 }
 
 function haalLokaalDatum() {
@@ -240,6 +287,8 @@ async function voegTijdlijnToe(tekst) {
 const p1 = await Homey.devices.getDevice({ id: P1_APPARAAT_ID });
 const warmtepomp = await Homey.devices.getDevice({ id: WARMTEPOMP_ID });
 const dap = await Homey.devices.getDevice({ id: DYNAMISCHE_ENERGIE_PRIJS_ID });
+const accu = await Homey.devices.getDevice({ id: ACCU_APPARAAT_ID });
+const zonForecastApparaat = await Homey.devices.getDevice({ id: ZON_FORECAST_APPARAAT_ID });
 const warmtepompTemperatuurInfo = bepaalWarmtepompTemperatuurInfo(warmtepomp.capabilitiesObj || {});
 
 // --------------------------
@@ -259,7 +308,15 @@ if (!Number.isFinite(huidigDoeltemperatuur)) {
 const nu = haalLokaalDatum();
 const uur = nu.getHours();
 const buitentemp = await haalVariabele('Buitentemperatuur', 10);
-const solarForecast = await haalVariabele('solar_forecast', 0);
+const zonForecastCapaciteiten = zonForecastApparaat.capabilitiesObj || {};
+const solarForecast = afronding(bepaalZonForecastKwh3Uur(zonForecastCapaciteiten), 2);
+const solarForecastDag = Number(zonForecastCapaciteiten['meter_kwh_forecast.this_day']?.value) || 0;
+
+// --------------------------
+// Accu (Solarbank) status
+// --------------------------
+const accuZonVermogen = Number(accu.capabilitiesObj?.solar_power?.value) || 0;
+const accuSoc = Number(accu.capabilitiesObj?.measure_battery?.value);
 
 // --------------------------
 // Prijzen via DAP-apparaat + gedeelde all-in-prijsvariabele
@@ -290,29 +347,43 @@ const opVakantie = await haalVariabele('vakantie', false);
 // --------------------------
 // Zonne-overschot buffer / hysterese
 // --------------------------
-const zonneBoostAan = solarForecast >= SOLAR_FORECAST_SKIP_BOOST_KWH;
+// Forecast-gate: hetzij de rollende 3-uursforecast, hetzij de hele dagforecast
+// is genoeg reden om zonne-boost sowieso vrij te geven.
+const zonneBoostAan = solarForecast >= SOLAR_FORECAST_SKIP_BOOST_KWH
+  || solarForecastDag >= SOLAR_FORECAST_DAG_SKIP_BOOST_KWH;
+
 const vorighZonneBoostActief = await haalVariabele(ZONNE_BOOST_ACTIEF_VARIABELE, false);
 let zonneBoostActief = vorighZonneBoostActief;
 let zonnebufferReden = '';
 
+// Twee onafhankelijke signalen voor "er is nu zonne-overschot":
+// - P1 netto export (pas negatief ná Accu-lading, dus reageert laat)
+// - Accu's eigen live zonvermogen (reageert direct, ook terwijl Accu nog laadt)
+const netToontOverschot = netwerkvermogen < ZONNE_BOOST_AAN_WATT;
+const netToontGeenOverschotMeer = netwerkvermogen > ZONNE_BOOST_UIT_WATT;
+const accuToontOverschot = accuZonVermogen > ACCU_ZON_AAN_WATT;
+const accuToontGeenOverschotMeer = accuZonVermogen < ACCU_ZON_UIT_WATT;
+
 if (!zonneBoostAan) {
   zonneBoostActief = false;
-  zonnebufferReden = 'Zonne-boost uitgeschakeld (solarForecast ' + solarForecast + ' kWh < ' + SOLAR_FORECAST_SKIP_BOOST_KWH + ' kWh)';
+  zonnebufferReden = 'Zonne-boost uitgeschakeld (forecast 3u ' + solarForecast + ' kWh < ' + SOLAR_FORECAST_SKIP_BOOST_KWH + ' kWh, dag ' + solarForecastDag + ' kWh < ' + SOLAR_FORECAST_DAG_SKIP_BOOST_KWH + ' kWh)';
 } else if (vorighZonneBoostActief) {
-  if (netwerkvermogen > ZONNE_BOOST_UIT_WATT) {
+  // Pas uitschakelen als BEIDE signalen geen overschot meer laten zien.
+  if (netToontGeenOverschotMeer && accuToontGeenOverschotMeer) {
     zonneBoostActief = false;
-    zonnebufferReden = 'Zonne-boost UIT via buffer: netwerk ' + netwerkvermogen + 'W > ' + ZONNE_BOOST_UIT_WATT + 'W';
+    zonnebufferReden = 'Zonne-boost UIT via buffer: netwerk ' + netwerkvermogen + 'W > ' + ZONNE_BOOST_UIT_WATT + 'W én Accu-zon ' + accuZonVermogen + 'W < ' + ACCU_ZON_UIT_WATT + 'W';
   } else {
     zonneBoostActief = true;
-    zonnebufferReden = 'Zonne-boost blijft AAN via buffer: netwerk ' + netwerkvermogen + 'W <= ' + ZONNE_BOOST_UIT_WATT + 'W';
+    zonnebufferReden = 'Zonne-boost blijft AAN via buffer: netwerk ' + netwerkvermogen + 'W of Accu-zon ' + accuZonVermogen + 'W laat nog overschot zien';
   }
 } else {
-  if (netwerkvermogen < ZONNE_BOOST_AAN_WATT) {
+  // Al AAN zodra één van beide signalen overschot laat zien (ook terwijl Accu nog laadt).
+  if (netToontOverschot || accuToontOverschot) {
     zonneBoostActief = true;
-    zonnebufferReden = 'Zonne-boost AAN via buffer: netwerk ' + netwerkvermogen + 'W < ' + ZONNE_BOOST_AAN_WATT + 'W';
+    zonnebufferReden = 'Zonne-boost AAN via buffer: netwerk ' + netwerkvermogen + 'W < ' + ZONNE_BOOST_AAN_WATT + 'W of Accu-zon ' + accuZonVermogen + 'W > ' + ACCU_ZON_AAN_WATT + 'W';
   } else {
     zonneBoostActief = false;
-    zonnebufferReden = 'Zonne-boost blijft UIT via buffer: netwerk ' + netwerkvermogen + 'W >= ' + ZONNE_BOOST_AAN_WATT + 'W';
+    zonnebufferReden = 'Zonne-boost blijft UIT via buffer: netwerk ' + netwerkvermogen + 'W en Accu-zon ' + accuZonVermogen + 'W beide onder drempel';
   }
 }
 
@@ -334,6 +405,7 @@ redenen.push('Prijsrang vandaag: #' + huidigePrijsRang + '/' + BLOKKEN_PER_DAG +
 redenen.push('Goedkoop uur: ' + isGoedkoopUur);
 redenen.push('Duur uur: ' + isDuurUur);
 redenen.push('Negatieve all-in prijs: ' + isNegatieveAllInPrijs);
+redenen.push('Accu: soc=' + (Number.isFinite(accuSoc) ? accuSoc + '%' : 'onbekend') + ', zonvermogen=' + accuZonVermogen + 'W');
 redenen.push(zonnebufferReden);
 
 // Prioriteit:
@@ -451,6 +523,9 @@ const samenvatting =
   ', isNegatieveAllInPrijs=' + isNegatieveAllInPrijs +
   ', zonneBoostActief=' + zonneBoostActief +
   ', solarForecast=' + solarForecast +
+  ', solarForecastDag=' + solarForecastDag +
+  ', accuZonVermogen=' + accuZonVermogen +
+  ', accuSoc=' + (Number.isFinite(accuSoc) ? accuSoc : 'onbekend') +
   ', buitentemp=' + buitentemp +
   ', gemetenBuffervatTemp=' + (warmtepompTemperatuurInfo.gemetenTemperatuur == null ? 'onbekend' : afronding(warmtepompTemperatuurInfo.gemetenTemperatuur)) +
   ', gemetenBuffervatCap=' + warmtepompTemperatuurInfo.gemetenTemperatuurCapability +
@@ -498,6 +573,9 @@ return {
   zonneBoostAan: zonneBoostAan,
   zonneBoostActief: zonneBoostActief,
   solarForecast: solarForecast,
+  solarForecastDag: solarForecastDag,
+  accuZonVermogen: accuZonVermogen,
+  accuSoc: Number.isFinite(accuSoc) ? accuSoc : null,
   buitentemp: buitentemp,
   huidigDoeltemp: huidigDoeltemperatuur,
   doeltemp: doeltemp,

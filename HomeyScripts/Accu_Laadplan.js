@@ -5,7 +5,7 @@
 // dag die nodig zijn om dat tekort te dekken.
 //
 // Werking (elke run herberekend, geen eenmalig ochtendplan):
-// 1. tekort = min(resterende ruimte in accu, 14 kWh - (zon-forecast x 0.85))
+// 1. tekort = min(resterende ruimte in accu, 14 kWh - zon-forecast)
 // 2. blokken nodig = tekort / (maxLaadvermogen x kwartier), afgerond naar boven
 // 3. als het huidige kwartierblok bij de N goedkoopste van vandaag hoort ÉN er
 //    nu geen zon beschikbaar is -> zet grid_charge_power op maxLaadvermogen,
@@ -14,22 +14,24 @@
 //
 // Vereist: Anker Solix app in Modbus-modus (grid_charge_power werkt niet via cloud).
 //
+// Zon-forecast komt van het Power by the Hour-device Zonnepanelen_Σsolar
+// (capability meter_kwh_forecast.this_day, "Prognose deze dag").
+//
 // Flow-setup: cron elke 15 minuten (aansluitend op de kwartier-prijsblokken).
 // ==========================
 
 const config = {
   accuDeviceId:            'd0b80416-826c-4db9-9a4e-163796f60d5a', // "Accu"
   dapDeviceId:              'adc99ffc-add2-40d0-b664-8ce3b19c28af', // Power by the Hour: NL_Netherlands
+  zonForecastDeviceId:      '865bc38a-e913-4771-aec7-b6bc7ab46b6a', // Zonnepanelen_Σsolar (Power by the Hour) — "Prognose deze dag"
 
   accuCapaciteitKwh:        14,
   maxLaadvermogenWatt:      3500,
-  zonOpbrengstFactor:       0.85, // veiligheidsmarge op de forecast
   blokMinuten:              15,
   blokkenPerDag:            96,
   minTekortKwh:             0.2, // kleiner tekort dan dit: niet de moeite
   zonAanwezigDrempelWatt:   100, // boven dit vermogen: zon regelt het zelf, niet ingrijpen
 
-  solarForecastDagVariabele: 'solar_forecast_dag',
   prijsVariabele:            'electra_prijs', // all-in prijs, berekend door Electra_Prijs.js
 
   dryRun: false,
@@ -89,9 +91,11 @@ async function sendTimelineIfChanged(newState, message) {
 
 const accu = await Homey.devices.getDevice({ id: config.accuDeviceId });
 const dap  = await Homey.devices.getDevice({ id: config.dapDeviceId });
+const zonForecast = await Homey.devices.getDevice({ id: config.zonForecastDeviceId });
 
 if (!accu) throw new Error(`Accu-apparaat (${config.accuDeviceId}) niet gevonden`);
 if (!dap)  throw new Error(`Prijs-apparaat (${config.dapDeviceId}) niet gevonden`);
+if (!zonForecast) throw new Error(`Zon-forecast-apparaat (${config.zonForecastDeviceId}) niet gevonden`);
 
 const soc = Number(accu.capabilitiesObj?.measure_battery?.value);
 if (!Number.isFinite(soc)) throw new Error("Ongeldige 'measure_battery' op Accu");
@@ -103,15 +107,14 @@ const zonBeschikbaar     = huidigZonvermogen > config.zonAanwezigDrempelWatt;
 const prijsRang = Number(dap.capabilitiesObj?.meter_rank_price_h0_this_day?.value);
 if (!Number.isFinite(prijsRang)) throw new Error("Ongeldige 'meter_rank_price_h0_this_day' op DAP-apparaat");
 
-const solarForecastDag = await haalLogicaVariabele(config.solarForecastDagVariabele, 0);
+const solarForecastDag = Number(zonForecast.capabilitiesObj?.['meter_kwh_forecast.this_day']?.value) || 0;
 const huidigePrijs = await haalLogicaVariabele(config.prijsVariabele, 0);
 
 // ─── Tekort berekenen ──────────────────────────────────────────────────────────
 
 const huidigeKwh = (soc / 100) * config.accuCapaciteitKwh;
 const resterendeRuimteKwh = Math.max(0, config.accuCapaciteitKwh - huidigeKwh);
-const effectieveZonKwh = solarForecastDag * config.zonOpbrengstFactor;
-const theoretischTekortKwh = Math.max(0, config.accuCapaciteitKwh - effectieveZonKwh);
+const theoretischTekortKwh = Math.max(0, config.accuCapaciteitKwh - solarForecastDag);
 const tekortKwh = Math.min(theoretischTekortKwh, resterendeRuimteKwh);
 
 const heeftTekort = tekortKwh >= config.minTekortKwh;
@@ -129,7 +132,7 @@ const gewenstVermogen = magNetLaden ? config.maxLaadvermogenWatt : 0;
 
 logLine(
   `soc=${soc}% (${afronding(huidigeKwh)} kWh) | ruimte=${afronding(resterendeRuimteKwh)} kWh | ` +
-  `zonForecast=${afronding(solarForecastDag)} kWh (effectief ${afronding(effectieveZonKwh)}) | ` +
+  `zonForecast=${afronding(solarForecastDag)} kWh | ` +
   `tekort=${afronding(tekortKwh)} kWh | blokkenNodig=${blokkenNodig}/${config.blokkenPerDag} | ` +
   `prijsRang=#${prijsRang} (${afronding(huidigePrijs, 4)}) | goedkoopGenoeg=${isGoedkoopGenoeg} | ` +
   `zonNu=${huidigZonvermogen}W (beschikbaar=${zonBeschikbaar}) | magNetLaden=${magNetLaden} | ` +
@@ -154,7 +157,7 @@ let message;
 
 if (!heeftTekort) {
   state = 'geen-tekort';
-  message = `Accu: geen netlaadtekort (zon dekt naar verwachting ${afronding(effectieveZonKwh)} kWh)`;
+  message = `Accu: geen netlaadtekort (zon dekt naar verwachting ${afronding(solarForecastDag)} kWh)`;
 } else if (magNetLaden) {
   state = `laden-${blokkenNodig}`;
   message = `Accu laadt vanaf net: ${gewenstVermogen}W (prijsrang #${prijsRang}, tekort ${afronding(tekortKwh)} kWh, ${blokkenNodig} blokken nodig)`;
@@ -175,7 +178,6 @@ return {
   huidigeKwh: afronding(huidigeKwh),
   resterendeRuimteKwh: afronding(resterendeRuimteKwh),
   solarForecastDag: afronding(solarForecastDag),
-  effectieveZonKwh: afronding(effectieveZonKwh),
   tekortKwh: afronding(tekortKwh),
   heeftTekort,
   blokkenNodig,
