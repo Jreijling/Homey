@@ -20,6 +20,19 @@ class SolarbankDevice extends Homey.Device {
       }
     }
 
+    // Devices paired before the energy config was added to the manifest keep
+    // their old (empty) energy object. Apply it explicitly so Homey Energy
+    // recognises this device as a home battery with charged/discharged meters.
+    try {
+      await this.setEnergy({
+        homeBattery: true,
+        meterPowerImportedCapability: 'meter_power.charged',
+        meterPowerExportedCapability: 'meter_power.discharged',
+      });
+    } catch (err) {
+      this.error('setEnergy failed:', err.message);
+    }
+
     // State for flow triggers
     this._wasCharging    = false;
     this._wasDischarging = false;
