@@ -30,6 +30,10 @@ Monitor and control your **Anker Solix** solar battery system from Homey.
 | Net grid power (W, + import / − export) | ✅ |
 | Grid import power (W) | ✅ |
 | Grid export power (W) | ✅ |
+| Total imported / exported (kWh, cumulative) | ✅ MQTT |
+| Imported / exported today (kWh) | ✅ MQTT |
+
+Power values update every ~5 s over Anker's cloud MQTT realtime channel (P1 Meter AE1R0, Smart Meter A17X7, Shelly Pro 3EM), with the REST poll as fallback. The meter registers as a cumulative main meter in Homey Energy, like a HomeWizard or Pulse P1 meter (device setting, on by default).
 
 ### Power System
 | Capability | Read |

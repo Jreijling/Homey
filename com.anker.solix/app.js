@@ -8,6 +8,7 @@ const AnkerSolixMqtt = require('./lib/AnkerSolixMqtt');
 const DEFAULT_POLL_INTERVAL_S = 60;
 const MIN_POLL_INTERVAL_S     = 30;
 const MODBUS_POLL_INTERVAL_MS = 10000;
+const MQTT_RETRY_MS           = 60000;
 
 class AnkerSolixApp extends Homey.App {
 
@@ -18,6 +19,9 @@ class AnkerSolixApp extends Homey.App {
     this._siteCache    = {};   // siteId → { site, sceneData }
     this._pollTimer    = null;
     this._modbusTimer  = null;
+    this._realtime     = null;   // AnkerSolixMqtt.RealtimeSession for smart meters
+    this._realtimeKey  = '';
+    this._realtimeRetry = null;
 
     // Re-initialise API when credentials change in settings
     this.homey.settings.on('set', async key => {
@@ -72,6 +76,7 @@ class AnkerSolixApp extends Homey.App {
 
   async _resetApi() {
     this._cancelPoll();
+    this._stopRealtime();
     this._api       = null;
     this._siteCache = {};
     await this._initApi();
@@ -183,6 +188,8 @@ class AnkerSolixApp extends Homey.App {
 
       this.log(`Poll complete – ${sites.length} site(s) updated`);
 
+      this.refreshRealtime().catch(err => this.error('MQTT realtime start failed:', err.message));
+
       if (this._modbusEnabled()) {
         await this._pollModbus(); // overlays fresher local values + emits
       } else {
@@ -208,6 +215,71 @@ class AnkerSolixApp extends Homey.App {
     await AnkerSolixMqtt.setPowerLimits({
       mqttInfo, devicePn, deviceSn, gridExportLimitW, acInputLimitW,
     });
+  }
+
+  // ─── MQTT realtime telemetry (smart meters) ───────────────────────────────
+
+  /**
+   * (Re)starts the MQTT realtime session for all paired smart meters, so they
+   * receive ~5 s updates plus cumulative import/export energy counters that
+   * the REST API doesn't expose. No-op when the device set is unchanged.
+   */
+  async refreshRealtime() {
+    if (!this._api || this._realtimeStarting) return;
+    this._realtimeStarting = true;
+    try {
+      await this._startRealtime();
+    } finally {
+      this._realtimeStarting = false;
+    }
+  }
+
+  async _startRealtime() {
+
+    const devices = this.homey.drivers.getDriver('smart-meter').getDevices()
+      .map(d => ({ deviceSn: d.getStoreValue('device_sn'), devicePn: d.getStoreValue('device_pn') }))
+      .filter(d => d.deviceSn && d.devicePn);
+
+    const key = devices.map(d => `${d.devicePn}/${d.deviceSn}`).sort().join(',');
+    if (this._realtime && key === this._realtimeKey) return;
+
+    this._stopRealtime();
+    if (devices.length === 0) return;
+
+    const mqttInfo = await this._api.getMqttInfo();
+    if (!mqttInfo.endpoint_addr) throw new Error('No MQTT endpoint returned by Anker cloud');
+
+    this._realtimeKey = key;
+    this._realtime = new AnkerSolixMqtt.RealtimeSession({
+      mqttInfo,
+      devices,
+      log:    (...a) => this.log(...a),
+      error:  (...a) => this.error(...a),
+      onData: (deviceSn, devicePn, msgType, fields) => {
+        this.homey.emit('anker_solix_mqtt', { deviceSn, devicePn, msgType, fields });
+      },
+      onClose: () => {
+        this.log(`MQTT realtime closed – retrying in ${MQTT_RETRY_MS / 1000}s`);
+        this._realtime = null;
+        this._realtimeRetry = this.homey.setTimeout(() => {
+          this._realtimeRetry = null;
+          this.refreshRealtime().catch(err => this.error('MQTT realtime restart failed:', err.message));
+        }, MQTT_RETRY_MS);
+      },
+    });
+    this._realtime.start();
+  }
+
+  _stopRealtime() {
+    if (this._realtimeRetry) {
+      this.homey.clearTimeout(this._realtimeRetry);
+      this._realtimeRetry = null;
+    }
+    if (this._realtime) {
+      this._realtime.stop();
+      this._realtime = null;
+    }
+    this._realtimeKey = '';
   }
 
   // ─── Public helpers for drivers/devices ──────────────────────────────────
@@ -247,6 +319,7 @@ class AnkerSolixApp extends Homey.App {
 
     // Switch to new API without waiting for the settings event
     this._cancelPoll();
+    this._stopRealtime();
     this._api = api;
     this._schedulePoll(0);
   }
@@ -289,6 +362,7 @@ class AnkerSolixApp extends Homey.App {
   async onUninit() {
     this._cancelPoll();
     this._cancelModbusPoll();
+    this._stopRealtime();
     this.log('Anker Solix stopped');
   }
 }

@@ -1,6 +1,6 @@
 {
   "id": "com.anker.solix",
-  "version": "1.0.24",
+  "version": "1.1.1",
   "compatibility": ">=12.0.0",
   "sdk": 3,
   "platforms": ["local", "cloud"],
@@ -285,14 +285,41 @@
       "capabilities": [
         "measure_power",
         "grid_import_power",
-        "grid_export_power"
+        "grid_export_power",
+        "meter_power.imported",
+        "meter_power.exported",
+        "meter_power.imported_today",
+        "meter_power.exported_today"
       ],
-      "energy": {},
+      "capabilitiesOptions": {
+        "measure_power":              { "title": { "en": "Net Grid Power", "nl": "Netto netvermogen" } },
+        "meter_power.imported":       { "title": { "en": "Total Imported", "nl": "Totaal afgenomen" } },
+        "meter_power.exported":       { "title": { "en": "Total Exported", "nl": "Totaal teruggeleverd" } },
+        "meter_power.imported_today": { "title": { "en": "Imported Today", "nl": "Vandaag afgenomen" } },
+        "meter_power.exported_today": { "title": { "en": "Exported Today", "nl": "Vandaag teruggeleverd" } }
+      },
+      "energy": {
+        "cumulative": true,
+        "cumulativeImportedCapability": "meter_power.imported",
+        "cumulativeExportedCapability": "meter_power.exported"
+      },
       "images": {
         "small": "/drivers/smart-meter/assets/images/small.png",
         "large": "/drivers/smart-meter/assets/images/large.png",
         "xlarge": "/drivers/smart-meter/assets/images/xlarge.png"
       },
+      "settings": [
+        {
+          "id": "main_meter",
+          "type": "checkbox",
+          "value": true,
+          "label": { "en": "Use as main meter in Homey Energy", "nl": "Gebruik als hoofdmeter in Homey Energie" },
+          "hint": {
+            "en": "Reports cumulative grid import/export to Homey Energy, like a HomeWizard or Pulse P1 meter. Disable when another P1 meter already fills this role, to avoid double counting.",
+            "nl": "Meldt cumulatieve netafname/-teruglevering aan Homey Energie, zoals een HomeWizard- of Pulse P1-meter. Zet uit als een andere P1-meter deze rol al heeft, om dubbeltelling te voorkomen."
+          }
+        }
+      ],
       "pair": [
         {
           "id": "list_devices",
