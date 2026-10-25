@@ -1,0 +1,437 @@
+{
+  "id": "nl.reijling.alfen",
+  "version": "1.0.0",
+  "compatibility": ">=12.4.5",
+  "sdk": 3,
+  "platforms": ["local"],
+  "brandColor": "#E30613",
+  "name": { "en": "Alfen ACE", "nl": "Alfen ACE" },
+  "description": {
+    "en": "Monitor and control your Alfen charging station over Modbus TCP",
+    "nl": "Bewaak en beheer uw Alfen laadpaal via Modbus TCP"
+  },
+  "tags": {
+    "en": ["alfen", "ace", "ev", "charger", "charging station", "modbus"],
+    "nl": ["alfen", "ace", "ev", "laadpaal", "laadstation", "modbus"]
+  },
+  "category": ["energy"],
+  "permissions": [],
+  "images": {
+    "small": "/assets/images/small.png",
+    "large": "/assets/images/large.png",
+    "xlarge": "/assets/images/xlarge.png"
+  },
+  "author": {
+    "name": "Jeroen Reijling",
+    "email": "jeroen@reijling.nl"
+  },
+  "capabilities": {
+    "charger_power_l1": {
+      "type": "number",
+      "title": { "en": "Power L1", "nl": "Vermogen L1" },
+      "units": "W",
+      "getable": true,
+      "setable": false,
+      "insights": true,
+      "decimals": 0,
+      "uiComponent": "sensor",
+      "icon": "/assets/icon.svg"
+    },
+    "charger_power_l2": {
+      "type": "number",
+      "title": { "en": "Power L2", "nl": "Vermogen L2" },
+      "units": "W",
+      "getable": true,
+      "setable": false,
+      "insights": true,
+      "decimals": 0,
+      "uiComponent": "sensor",
+      "icon": "/assets/icon.svg"
+    },
+    "charger_power_l3": {
+      "type": "number",
+      "title": { "en": "Power L3", "nl": "Vermogen L3" },
+      "units": "W",
+      "getable": true,
+      "setable": false,
+      "insights": true,
+      "decimals": 0,
+      "uiComponent": "sensor",
+      "icon": "/assets/icon.svg"
+    },
+    "charger_voltage_l1": {
+      "type": "number",
+      "title": { "en": "Voltage L1", "nl": "Spanning L1" },
+      "units": "V",
+      "getable": true,
+      "setable": false,
+      "insights": false,
+      "decimals": 1,
+      "uiComponent": "sensor",
+      "icon": "/assets/icon.svg"
+    },
+    "charger_voltage_l2": {
+      "type": "number",
+      "title": { "en": "Voltage L2", "nl": "Spanning L2" },
+      "units": "V",
+      "getable": true,
+      "setable": false,
+      "insights": false,
+      "decimals": 1,
+      "uiComponent": "sensor",
+      "icon": "/assets/icon.svg"
+    },
+    "charger_voltage_l3": {
+      "type": "number",
+      "title": { "en": "Voltage L3", "nl": "Spanning L3" },
+      "units": "V",
+      "getable": true,
+      "setable": false,
+      "insights": false,
+      "decimals": 1,
+      "uiComponent": "sensor",
+      "icon": "/assets/icon.svg"
+    },
+    "charger_current_l1": {
+      "type": "number",
+      "title": { "en": "Current L1", "nl": "Stroom L1" },
+      "units": "A",
+      "getable": true,
+      "setable": false,
+      "insights": true,
+      "decimals": 1,
+      "uiComponent": "sensor",
+      "icon": "/assets/icon.svg"
+    },
+    "charger_current_l2": {
+      "type": "number",
+      "title": { "en": "Current L2", "nl": "Stroom L2" },
+      "units": "A",
+      "getable": true,
+      "setable": false,
+      "insights": true,
+      "decimals": 1,
+      "uiComponent": "sensor",
+      "icon": "/assets/icon.svg"
+    },
+    "charger_current_l3": {
+      "type": "number",
+      "title": { "en": "Current L3", "nl": "Stroom L3" },
+      "units": "A",
+      "getable": true,
+      "setable": false,
+      "insights": true,
+      "decimals": 1,
+      "uiComponent": "sensor",
+      "icon": "/assets/icon.svg"
+    },
+    "max_current": {
+      "type": "number",
+      "title": { "en": "Max charge current", "nl": "Maximale laadstroom" },
+      "units": "A",
+      "getable": true,
+      "setable": true,
+      "insights": false,
+      "min": 6,
+      "max": 32,
+      "step": 1,
+      "decimals": 0,
+      "uiComponent": "slider",
+      "icon": "/assets/icon.svg"
+    },
+    "actual_max_current": {
+      "type": "number",
+      "title": { "en": "Applied max current", "nl": "Toegepaste max. stroom" },
+      "units": "A",
+      "getable": true,
+      "setable": false,
+      "insights": false,
+      "decimals": 1,
+      "uiComponent": "sensor",
+      "icon": "/assets/icon.svg"
+    },
+    "safe_current": {
+      "type": "number",
+      "title": { "en": "Safe current", "nl": "Veilige stroom" },
+      "units": "A",
+      "getable": true,
+      "setable": false,
+      "insights": false,
+      "decimals": 1,
+      "uiComponent": "sensor",
+      "icon": "/assets/icon.svg"
+    },
+    "valid_time_remaining": {
+      "type": "number",
+      "title": { "en": "Setpoint valid for", "nl": "Instelpunt geldig" },
+      "units": "s",
+      "getable": true,
+      "setable": false,
+      "insights": false,
+      "decimals": 0,
+      "uiComponent": "sensor",
+      "icon": "/assets/icon.svg"
+    },
+    "charge_phases": {
+      "type": "enum",
+      "title": { "en": "Charge phases", "nl": "Laadfasen" },
+      "getable": true,
+      "setable": true,
+      "insights": false,
+      "uiComponent": "picker",
+      "values": [
+        { "id": "1", "title": { "en": "1 phase", "nl": "1 fase" } },
+        { "id": "3", "title": { "en": "3 phases", "nl": "3 fasen" } }
+      ]
+    },
+    "meter_active": {
+      "type": "boolean",
+      "title": { "en": "Meter active", "nl": "Meter actief" },
+      "getable": true,
+      "setable": false,
+      "insights": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/icon.svg"
+    },
+    "grid_power": {
+      "type": "number",
+      "title": { "en": "Grid power", "nl": "Netvermogen" },
+      "units": "W",
+      "getable": true,
+      "setable": false,
+      "insights": false,
+      "decimals": 0,
+      "uiComponent": "sensor",
+      "icon": "/assets/icon.svg"
+    },
+    "car_connected": {
+      "type": "boolean",
+      "title": { "en": "Car connected", "nl": "Auto aangesloten" },
+      "getable": true,
+      "setable": false,
+      "insights": true,
+      "uiComponent": "sensor",
+      "icon": "/assets/icon.svg"
+    },
+    "charging_paused": {
+      "type": "boolean",
+      "title": { "en": "Charging paused", "nl": "Laden gepauzeerd" },
+      "getable": true,
+      "setable": false,
+      "insights": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/icon.svg"
+    },
+    "solar_mode": {
+      "type": "boolean",
+      "title": { "en": "Solar mode", "nl": "Zonnemodus" },
+      "getable": true,
+      "setable": true,
+      "insights": false,
+      "uiComponent": "toggle",
+      "icon": "/assets/icon.svg"
+    },
+    "solar_mode_active": {
+      "type": "boolean",
+      "title": { "en": "Charging on solar", "nl": "Laden op zon" },
+      "getable": true,
+      "setable": false,
+      "insights": true,
+      "uiComponent": "sensor",
+      "icon": "/assets/icon.svg"
+    },
+    "solar_min_charge_kw": {
+      "type": "number",
+      "title": { "en": "Solar start power", "nl": "Zon startvermogen" },
+      "units": "kW",
+      "getable": true,
+      "setable": true,
+      "insights": false,
+      "min": 1.4,
+      "max": 11,
+      "step": 0.1,
+      "decimals": 1,
+      "uiComponent": "slider",
+      "icon": "/assets/icon.svg"
+    }
+  },
+  "drivers": [
+    {
+      "id": "ace",
+      "name": { "en": "Alfen charging station", "nl": "Alfen laadpaal" },
+      "class": "evcharger",
+      "platforms": ["local"],
+      "connectivity": ["lan"],
+      "capabilities": [
+        "evcharger_charging",
+        "evcharger_charging_state",
+        "measure_power",
+        "meter_power",
+        "charger_power_l1",
+        "charger_power_l2",
+        "charger_power_l3",
+        "charger_voltage_l1",
+        "charger_voltage_l2",
+        "charger_voltage_l3",
+        "charger_current_l1",
+        "charger_current_l2",
+        "charger_current_l3",
+        "max_current",
+        "actual_max_current",
+        "safe_current",
+        "charge_phases",
+        "valid_time_remaining",
+        "meter_active",
+        "grid_power",
+        "car_connected",
+        "charging_paused",
+        "solar_mode",
+        "solar_mode_active",
+        "solar_min_charge_kw"
+      ],
+      "capabilitiesOptions": {
+        "measure_power": {
+          "title": { "en": "Charging power", "nl": "Laadvermogen" }
+        },
+        "meter_power": {
+          "title": { "en": "Total charged", "nl": "Totaal geladen" }
+        }
+      },
+      "energy": {
+        "meterPowerImportedCapability": "meter_power"
+      },
+      "images": {
+        "small": "/drivers/ace/assets/images/small.png",
+        "large": "/drivers/ace/assets/images/large.png",
+        "xlarge": "/drivers/ace/assets/images/xlarge.png"
+      },
+      "pair": [
+        {
+          "id": "start"
+        },
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "settings": [
+        {
+          "type": "group",
+          "label": { "en": "Connection", "nl": "Verbinding" },
+          "children": [
+            {
+              "id": "host",
+              "type": "text",
+              "label": { "en": "IP address", "nl": "IP-adres" },
+              "value": ""
+            },
+            {
+              "id": "port",
+              "type": "number",
+              "label": { "en": "Port", "nl": "Poort" },
+              "value": 502,
+              "min": 1,
+              "max": 65535
+            },
+            {
+              "id": "unit_id",
+              "type": "number",
+              "label": { "en": "Socket (unit id)", "nl": "Aansluiting (unit id)" },
+              "hint": { "en": "1 for the first socket, 2 for the second socket of a double charger.", "nl": "1 voor de eerste aansluiting, 2 voor de tweede van een dubbele laadpaal." },
+              "value": 1,
+              "min": 1,
+              "max": 2
+            },
+            {
+              "id": "poll_interval",
+              "type": "number",
+              "label": { "en": "Poll interval", "nl": "Uitleesinterval" },
+              "units": { "en": "seconds", "nl": "seconden" },
+              "value": 10,
+              "min": 5,
+              "max": 300
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "flow": {
+    "triggers": [
+      {
+        "id": "car_connected",
+        "title": { "en": "Car connected", "nl": "Auto aangesloten" },
+        "args": [
+          { "type": "device", "name": "device", "filter": "driver_id=ace" }
+        ]
+      },
+      {
+        "id": "car_disconnected",
+        "title": { "en": "Car disconnected", "nl": "Auto losgekoppeld" },
+        "args": [
+          { "type": "device", "name": "device", "filter": "driver_id=ace" }
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "id": "set_max_current",
+        "title": { "en": "Set max charge current", "nl": "Stel maximale laadstroom in" },
+        "titleFormatted": { "en": "Set max charge current to [[current]] A", "nl": "Stel maximale laadstroom in op [[current]] A" },
+        "args": [
+          { "type": "device", "name": "device", "filter": "driver_id=ace" },
+          { "type": "number", "name": "current", "min": 6, "max": 32, "step": 1, "placeholder": { "en": "16", "nl": "16" } }
+        ]
+      },
+      {
+        "id": "set_charge_phases",
+        "title": { "en": "Set charge phases", "nl": "Stel laadfasen in" },
+        "titleFormatted": { "en": "Charge on [[phases]]", "nl": "Laad op [[phases]]" },
+        "args": [
+          { "type": "device", "name": "device", "filter": "driver_id=ace" },
+          {
+            "type": "dropdown",
+            "name": "phases",
+            "values": [
+              { "id": "1", "label": { "en": "1 phase", "nl": "1 fase" } },
+              { "id": "3", "label": { "en": "3 phases", "nl": "3 fasen" } }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "set_solar_mode",
+        "title": { "en": "Turn solar mode on or off", "nl": "Zet zonnemodus aan of uit" },
+        "titleFormatted": { "en": "Turn solar mode [[state]]", "nl": "Zet zonnemodus [[state]]" },
+        "args": [
+          { "type": "device", "name": "device", "filter": "driver_id=ace" },
+          {
+            "type": "dropdown",
+            "name": "state",
+            "values": [
+              { "id": "on", "label": { "en": "on", "nl": "aan" } },
+              { "id": "off", "label": { "en": "off", "nl": "uit" } }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "update_grid_power",
+        "title": { "en": "Update grid power", "nl": "Geef netvermogen door" },
+        "titleFormatted": { "en": "Grid power is [[power]] W", "nl": "Netvermogen is [[power]] W" },
+        "hint": { "en": "Positive = import, negative = export. Used by solar mode.", "nl": "Positief = afname, negatief = teruglevering. Wordt gebruikt door de zonnemodus." },
+        "args": [
+          { "type": "device", "name": "device", "filter": "driver_id=ace" },
+          { "type": "number", "name": "power", "placeholder": { "en": "W", "nl": "W" } }
+        ]
+      }
+    ]
+  }
+}

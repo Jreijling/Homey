@@ -1,0 +1,13 @@
+{
+  "name": "nl.reijling.alfen",
+  "version": "1.0.0",
+  "description": "Alfen ACE charging station for Homey",
+  "main": "app.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "homey app run",
+    "test": "node --test test/*.test.js"
+  }
+}

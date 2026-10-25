@@ -1,0 +1,14 @@
+{
+  "pair": {
+    "title": "Verbind met uw Alfen laadpaal",
+    "intro": "Vul het IP-adres van de laadpaal in. Modbus TCP en \"Active load balancing: Energy Management System\" moeten aan staan in de ACE Service Installer.",
+    "host": "IP-adres",
+    "port": "Poort",
+    "unit_id": "Aansluiting",
+    "connect": "Verbinden"
+  },
+  "errors": {
+    "no_host": "Vul het IP-adres van de laadpaal in",
+    "connect_failed": "Kan de laadpaal niet bereiken: %{message}"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "pair": {
+    "title": "Connect to your Alfen charging station",
+    "intro": "Enter the IP address of the charging station. Modbus TCP and \"Active load balancing: Energy Management System\" must be enabled in the ACE Service Installer.",
+    "host": "IP address",
+    "port": "Port",
+    "unit_id": "Socket",
+    "connect": "Connect"
+  },
+  "errors": {
+    "no_host": "Enter the IP address of the charging station",
+    "connect_failed": "Could not reach the charging station: %{message}"
+  }
+}

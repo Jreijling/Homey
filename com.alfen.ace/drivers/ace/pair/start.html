@@ -1,0 +1,41 @@
+<header class="homey-header">
+  <h1 class="homey-title" data-i18n="pair.title"></h1>
+  <p class="homey-subtitle" data-i18n="pair.intro"></p>
+</header>
+
+<form class="homey-form" onsubmit="connect(event)">
+  <div class="homey-form-group">
+    <label class="homey-form-label" for="host" data-i18n="pair.host"></label>
+    <input class="homey-form-input" id="host" type="text" placeholder="192.168.1.50" required />
+  </div>
+  <div class="homey-form-group">
+    <label class="homey-form-label" for="port" data-i18n="pair.port"></label>
+    <input class="homey-form-input" id="port" type="number" value="502" min="1" max="65535" />
+  </div>
+  <div class="homey-form-group">
+    <label class="homey-form-label" for="unitId" data-i18n="pair.unit_id"></label>
+    <select class="homey-form-select" id="unitId">
+      <option value="1">1</option>
+      <option value="2">2</option>
+    </select>
+  </div>
+  <button class="homey-button-primary-full" id="connect" type="submit" data-i18n="pair.connect"></button>
+</form>
+
+<script type="application/javascript">
+  function connect(event) {
+    event.preventDefault();
+
+    const button = document.getElementById('connect');
+    button.classList.add('is-loading');
+
+    Homey.emit('connect', {
+      host:   document.getElementById('host').value,
+      port:   document.getElementById('port').value,
+      unitId: document.getElementById('unitId').value,
+    })
+      .then(() => Homey.showView('list_devices'))
+      .catch(err => Homey.alert(err.message || err))
+      .finally(() => button.classList.remove('is-loading'));
+  }
+</script>
