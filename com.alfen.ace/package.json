@@ -9,5 +9,8 @@
   "scripts": {
     "start": "homey app run",
     "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "homey-api": "^3.21.0"
   }
 }

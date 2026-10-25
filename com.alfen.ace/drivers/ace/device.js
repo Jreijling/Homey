@@ -7,6 +7,7 @@ const {
   REG_MAX_CURRENT, REG_CHARGE_PHASES,
   fromFloat32, parseMeter, parseSocket, mode3Status,
 } = require('../../lib/AlfenReader');
+const { readGrid, fuseLimit } = require('../../lib/LoadBalancer');
 
 const MIN_CURRENT      = 6;     // below this the Alfen suspends charging
 const DEFAULT_CURRENT  = 16;
@@ -123,10 +124,11 @@ class AceDevice extends Homey.Device {
       const client = this._client();
       const meter  = parseMeter(await client.readHoldingRegisters(METER_START, METER_COUNT));
       const socket = parseSocket(await client.readHoldingRegisters(SCN_START, SCN_COUNT));
+      const grid   = await this._readEnergyMeter();
 
       await this._applyMeter(meter);
       await this._applySocket(socket);
-      await this._applySetpoint(meter, socket);
+      await this._applySetpoint(meter, socket, grid);
 
       this._failures = 0;
       if (!this.getAvailable()) await this.setAvailable();
@@ -184,10 +186,65 @@ class AceDevice extends Homey.Device {
     this._lastConnected = carConnected;
   }
 
+  // ─── Energy meter (load balancing) ───────────────────────────────────────
+
+  /**
+   * Reads the energy meter set in the device settings. Returns null when no
+   * meter is configured, { ok: false } when it cannot be read.
+   */
+  async _readEnergyMeter() {
+    const id = (this.getSetting('meter_device_id') || '').trim();
+    if (!id) return null;
+
+    try {
+      const api    = await this.homey.app.getHomeyApi();
+      const device = await api.devices.getDevice({ id });
+      const grid   = readGrid(device.capabilitiesObj);
+
+      if (grid.power !== null) await this.updateGridPower(grid.power);
+      if (!grid.currents) throw new Error(`${device.name} reports no current or power per phase`);
+
+      this._logMeterError(null);
+      return { ok: true, ...grid };
+    } catch (err) {
+      this._logMeterError(err.message);
+      return { ok: false };
+    }
+  }
+
+  _logMeterError(message) {
+    if (message === this._meterError) return;
+    this._meterError = message;
+    if (message) this.error('Energy meter:', message);
+    else this.log('Energy meter OK');
+  }
+
+  /**
+   * Max current that keeps the main fuse safe, or null without a meter.
+   * When the meter cannot be read, fall back to the charger's safe current.
+   */
+  async _balanceLimit(meter, socket, grid) {
+    if (!grid) {
+      await this._set('load_balance_limit', null);
+      return null;
+    }
+    if (!grid.ok) return socket.safeCurrent ?? MIN_CURRENT;
+
+    const limit = fuseLimit({
+      fuse:            Number(this.getSetting('main_fuse')) || 25,
+      margin:          Number(this.getSetting('fuse_margin')) || 0,
+      gridCurrents:    grid.currents,
+      chargerCurrents: meter.phases.map(p => p.current),
+      phases:          socket.chargePhases === 1 ? 1 : 3,
+    });
+    await this._set('load_balance_limit', Math.max(0, limit));
+    return limit;
+  }
+
   // ─── Setpoint ─────────────────────────────────────────────────────────────
 
-  async _applySetpoint(meter, socket) {
-    const target  = await this._targetCurrent(meter, socket);
+  async _applySetpoint(meter, socket, grid) {
+    const target  = await this._targetCurrent(meter, socket, grid);
     const current = socket.modbusMaxCurrent;
 
     const changed = current === null || Math.abs(target - current) >= 0.5;
@@ -198,7 +255,15 @@ class AceDevice extends Homey.Device {
     await this._client().writeMultipleRegisters(REG_MAX_CURRENT, fromFloat32(target));
   }
 
-  async _targetCurrent(meter, socket) {
+  async _targetCurrent(meter, socket, grid) {
+    const limit     = await this._balanceLimit(meter, socket, grid);
+    const requested = await this._requestedCurrent(meter, socket);
+    const target    = limit === null ? requested : Math.min(requested, limit);
+    return target >= MIN_CURRENT ? target : 0;
+  }
+
+  /** Current asked for by the user or solar mode, before load balancing. */
+  async _requestedCurrent(meter, socket) {
     if (!this.getCapabilityValue('evcharger_charging')) return 0;
 
     const maxCurrent = this.getCapabilityValue('max_current') || DEFAULT_CURRENT;

@@ -15,7 +15,7 @@
     "nl": ["alfen", "ace", "ev", "laadpaal", "laadstation", "modbus"]
   },
   "category": ["energy"],
-  "permissions": [],
+  "permissions": ["homey:manager:api"],
   "images": {
     "small": "/assets/images/small.png",
     "large": "/assets/images/large.png",
@@ -240,6 +240,17 @@
       "uiComponent": "sensor",
       "icon": "/assets/icon.svg"
     },
+    "load_balance_limit": {
+      "type": "number",
+      "title": { "en": "Room on main fuse", "nl": "Ruimte hoofdzekering" },
+      "units": "A",
+      "getable": true,
+      "setable": false,
+      "insights": true,
+      "decimals": 0,
+      "uiComponent": "sensor",
+      "icon": "/assets/icon.svg"
+    },
     "solar_min_charge_kw": {
       "type": "number",
       "title": { "en": "Solar start power", "nl": "Zon startvermogen" },
@@ -287,7 +298,8 @@
         "charging_paused",
         "solar_mode",
         "solar_mode_active",
-        "solar_min_charge_kw"
+        "solar_min_charge_kw",
+        "load_balance_limit"
       ],
       "capabilitiesOptions": {
         "measure_power": {
@@ -357,6 +369,37 @@
               "value": 10,
               "min": 5,
               "max": 300
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "label": { "en": "Load balancing", "nl": "Load balancing" },
+          "children": [
+            {
+              "id": "meter_device_id",
+              "type": "text",
+              "label": { "en": "Energy meter device ID", "nl": "Device-ID energiemeter" },
+              "hint": { "en": "Homey device ID of your P1 meter (e.g. HomeWizard). Leave empty to disable load balancing. The meter must report current per phase (measure_current.l1-l3) or power per phase.", "nl": "Homey device-ID van je P1-meter (bijv. HomeWizard). Leeg laten om load balancing uit te zetten. De meter moet stroom per fase (measure_current.l1-l3) of vermogen per fase geven."},
+              "value": ""
+            },
+            {
+              "id": "main_fuse",
+              "type": "number",
+              "label": { "en": "Main fuse per phase", "nl": "Hoofdzekering per fase" },
+              "units": { "en": "A", "nl": "A" },
+              "value": 25,
+              "min": 6,
+              "max": 80
+            },
+            {
+              "id": "fuse_margin",
+              "type": "number",
+              "label": { "en": "Safety margin", "nl": "Veiligheidsmarge" },
+              "units": { "en": "A", "nl": "A" },
+              "value": 2,
+              "min": 0,
+              "max": 10
             }
           ]
         }

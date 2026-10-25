@@ -1,6 +1,7 @@
 'use strict';
 
 const Homey = require('homey');
+const { HomeyAPI } = require('homey-api');
 
 class AlfenApp extends Homey.App {
 
@@ -20,6 +21,17 @@ class AlfenApp extends Homey.App {
       .registerRunListener(args => device(args).updateGridPower(args.power));
 
     this.log('Alfen ACE app ready');
+  }
+
+  /** Homey Web API, used to read the energy meter chosen for load balancing. */
+  async getHomeyApi() {
+    if (!this._homeyApi) {
+      this._homeyApi = HomeyAPI.createAppAPI({ homey: this.homey }).catch(err => {
+        this._homeyApi = null;
+        throw err;
+      });
+    }
+    return this._homeyApi;
   }
 }
 
