@@ -5,7 +5,8 @@
     "host": "IP-adres",
     "port": "Poort",
     "unit_id": "Aansluiting",
-    "connect": "Verbinden"
+    "connect": "Verbinden",
+    "connecting": "Verbinden met de laadpaal…"
   },
   "errors": {
     "no_host": "Vul het IP-adres van de laadpaal in",

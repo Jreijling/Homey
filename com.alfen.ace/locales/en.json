@@ -5,7 +5,8 @@
     "host": "IP address",
     "port": "Port",
     "unit_id": "Socket",
-    "connect": "Connect"
+    "connect": "Connect",
+    "connecting": "Connecting to the charging station…"
   },
   "errors": {
     "no_host": "Enter the IP address of the charging station",

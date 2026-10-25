@@ -20,6 +20,7 @@
     </select>
   </div>
   <button class="homey-button-primary-full" id="connect" type="submit" data-i18n="pair.connect"></button>
+  <p id="status" style="margin-top: 1em;"></p>
 </form>
 
 <script type="application/javascript">
@@ -27,7 +28,10 @@
     event.preventDefault();
 
     const button = document.getElementById('connect');
+    const status = document.getElementById('status');
     button.classList.add('is-loading');
+    button.disabled = true;
+    status.textContent = Homey.__('pair.connecting');
 
     Homey.emit('connect', {
       host:   document.getElementById('host').value,
@@ -35,7 +39,13 @@
       unitId: document.getElementById('unitId').value,
     })
       .then(() => Homey.showView('list_devices'))
-      .catch(err => Homey.alert(err.message || err))
-      .finally(() => button.classList.remove('is-loading'));
+      .catch(err => {
+        status.textContent = err.message || String(err);
+        Homey.alert(err.message || String(err));
+      })
+      .finally(() => {
+        button.classList.remove('is-loading');
+        button.disabled = false;
+      });
   }
 </script>

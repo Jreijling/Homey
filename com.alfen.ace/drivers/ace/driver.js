@@ -26,12 +26,14 @@ class AceDriver extends Homey.Driver {
 
       port   = Number(port) || 502;
       unitId = Number(unitId) || 1;
+      this.log(`Pair: connecting to ${host}:${port} socket ${unitId}`);
 
       const client = new ModbusClient({ host, port, unitId });
       try {
         const socket = parseSocket(await client.readHoldingRegisters(SCN_START, SCN_COUNT));
         this.log(`Pair: ${host} socket ${unitId} mode 3 state ${socket.mode3State}`);
       } catch (err) {
+        this.error(`Pair: ${host}:${port} failed:`, err.message);
         throw new Error(this.homey.__('errors.connect_failed', { message: err.message }));
       } finally {
         client.close();
