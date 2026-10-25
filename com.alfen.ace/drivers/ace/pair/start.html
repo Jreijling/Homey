@@ -3,49 +3,58 @@
   <p class="homey-subtitle" data-i18n="pair.intro"></p>
 </header>
 
-<form class="homey-form" onsubmit="connect(event)">
+<div class="homey-form">
   <div class="homey-form-group">
-    <label class="homey-form-label" for="host" data-i18n="pair.host"></label>
-    <input class="homey-form-input" id="host" type="text" placeholder="192.168.1.50" required />
+    <label class="homey-form-label" for="alfen-host" data-i18n="pair.host"></label>
+    <input class="homey-form-input" id="alfen-host" type="text" placeholder="192.168.1.50" />
   </div>
   <div class="homey-form-group">
-    <label class="homey-form-label" for="port" data-i18n="pair.port"></label>
-    <input class="homey-form-input" id="port" type="number" value="502" min="1" max="65535" />
+    <label class="homey-form-label" for="alfen-port" data-i18n="pair.port"></label>
+    <input class="homey-form-input" id="alfen-port" type="number" value="502" min="1" max="65535" />
   </div>
   <div class="homey-form-group">
-    <label class="homey-form-label" for="unitId" data-i18n="pair.unit_id"></label>
-    <select class="homey-form-select" id="unitId">
+    <label class="homey-form-label" for="alfen-unit" data-i18n="pair.unit_id"></label>
+    <select class="homey-form-select" id="alfen-unit">
       <option value="1">1</option>
       <option value="2">2</option>
     </select>
   </div>
-  <button class="homey-button-primary-full" id="connect" type="submit" data-i18n="pair.connect"></button>
-  <p id="status" style="margin-top: 1em;"></p>
-</form>
+  <button class="homey-button-primary-full" id="alfen-connect" type="button" data-i18n="pair.connect"></button>
+  <p id="alfen-status" style="margin-top: 1em;"></p>
+</div>
 
 <script type="application/javascript">
-  function connect(event) {
-    event.preventDefault();
+  (function () {
+    var button = document.getElementById('alfen-connect');
+    var status = document.getElementById('alfen-status');
 
-    const button = document.getElementById('connect');
-    const status = document.getElementById('status');
-    button.classList.add('is-loading');
-    button.disabled = true;
-    status.textContent = Homey.__('pair.connecting');
+    function done() {
+      button.classList.remove('is-loading');
+      button.disabled = false;
+    }
 
-    Homey.emit('connect', {
-      host:   document.getElementById('host').value,
-      port:   document.getElementById('port').value,
-      unitId: document.getElementById('unitId').value,
-    })
-      .then(() => Homey.showView('list_devices'))
-      .catch(err => {
-        status.textContent = err.message || String(err);
-        Homey.alert(err.message || String(err));
+    function fail(err) {
+      var message = (err && err.message) || String(err);
+      status.textContent = message;
+      done();
+      Homey.alert(message);
+    }
+
+    button.addEventListener('click', function () {
+      button.classList.add('is-loading');
+      button.disabled = true;
+      status.textContent = Homey.__('pair.connecting');
+
+      Homey.emit('connect', {
+        host:   document.getElementById('alfen-host').value,
+        port:   document.getElementById('alfen-port').value,
+        unitId: document.getElementById('alfen-unit').value,
       })
-      .finally(() => {
-        button.classList.remove('is-loading');
-        button.disabled = false;
-      });
-  }
+        .then(function () {
+          done();
+          Homey.showView('list_devices');
+        })
+        .catch(fail);
+    });
+  })();
 </script>
