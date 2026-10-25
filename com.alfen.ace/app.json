@@ -333,6 +333,11 @@
           "template": "add_devices"
         }
       ],
+      "repair": [
+        {
+          "id": "select_meter"
+        }
+      ],
       "settings": [
         {
           "type": "group",

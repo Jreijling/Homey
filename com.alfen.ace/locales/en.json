@@ -11,5 +11,12 @@
   "errors": {
     "no_host": "Enter the IP address of the charging station",
     "connect_failed": "Could not reach the charging station: %{message}"
+  },
+  "repair": {
+    "title": "Energy meter for load balancing",
+    "intro": "Choose the meter that measures your grid connection. Only meters that report current or power per phase are listed.",
+    "none": "None (load balancing off)",
+    "save": "Save",
+    "saved": "Saved"
   }
 }

@@ -3,6 +3,7 @@
 const Homey = require('homey');
 const { ModbusClient } = require('../../lib/ModbusClient');
 const { SCN_START, SCN_COUNT, parseSocket } = require('../../lib/AlfenReader');
+const { readGrid } = require('../../lib/LoadBalancer');
 
 class AceDriver extends Homey.Driver {
 
@@ -48,6 +49,26 @@ class AceDriver extends Homey.Driver {
     });
 
     session.setHandler('list_devices', async () => (found ? [found] : []));
+  }
+
+  /** Repair: pick the energy meter used for load balancing from a list. */
+  async onRepair(session, device) {
+    session.setHandler('list_meters', async () => {
+      const api     = await this.homey.app.getHomeyApi();
+      const devices = Object.values(await api.devices.getDevices());
+
+      const meters = devices
+        .filter(d => readGrid(d.capabilitiesObj).currents)
+        .map(d => ({ id: d.id, name: d.name, zone: d.zoneName || '' }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      return { meters, selected: device.getSetting('meter_device_id') || '' };
+    });
+
+    session.setHandler('select_meter', async ({ id }) => {
+      await device.setSettings({ meter_device_id: id || '' });
+      return true;
+    });
   }
 }
 
