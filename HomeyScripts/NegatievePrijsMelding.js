@@ -15,9 +15,6 @@
 // ---------- Apparaat ID ----------
 const DYNAMISCHE_ENERGIE_PRIJS_ID = 'adc99ffc-add2-40d0-b664-8ce3b19c28af'; // Power by the Hour: NL_Netherlands
 
-// ---------- All-in prijs (kale prijs + energiebelasting, incl. BTW) ----------
-const ENERGIEBELASTING_PER_KWH = 0.0916; // excl. BTW, overheidstarief 2026
-const BTW_FACTOR = 1.21;
 
 // ---------- Logic-variabelen (voorkomen dubbele meldingen) ----------
 const VAR_LAATSTE_MELDDATUM_MORGEN = 'negatieve_prijs_morgen_laatste_melddatum';
@@ -31,8 +28,10 @@ function afronding(waarde, decimalen) {
   return Number(Number(waarde).toFixed(decimalen));
 }
 
-function alleInPrijs(kalePrijs) {
-  return afronding((kalePrijs + ENERGIEBELASTING_PER_KWH) * BTW_FACTOR, 4);
+// meter_price_* van Power by the Hour is al all-in (incl. opslag,
+// energiebelasting en BTW): niets meer optellen, alleen afronden.
+function alleInPrijs(prijs) {
+  return afronding(prijs, 4);
 }
 
 function haalLokaalDatum() {

@@ -1,13 +1,14 @@
 // ==========================
 // Electra Prijs - Homey Script
-// Enige script dat de kale prijs (Power by the Hour, incl. Frank Energie
-// opslag) omrekent naar de all-in prijs (+ energiebelasting, incl. BTW) en
-// wegzet in de logica-variabelen 'electra_prijs' (huidig) en
-// 'electra_prijs_volgende' (over 15 min).
+// Zet de all-in prijs van Power by the Hour in de logica-variabelen
+// 'electra_prijs' (huidig) en 'electra_prijs_volgende' (over 15 min).
+//
+// LET OP: meter_price_* van Power by the Hour is al all-in (Frank Energie
+// opslag + energiebelasting + BTW zijn in de app-instellingen meegenomen).
+// Hier dus GEEN belasting/BTW meer optellen, anders telt die dubbel.
 //
 // Accu_Laadplan.js, Thermostaat.js, Buffervat.js en NegatievePrijsMelding.js
-// lezen deze variabelen uit i.p.v. zelf de kale-prijs-naar-all-in-omrekening
-// te herhalen.
+// lezen deze variabelen uit.
 //
 // Flow-setup: trigger op prijswijziging (Power by the Hour "prijs verandert"
 // e.d.), niet op een cron - loopt zo exact synchroon met echte
@@ -16,10 +17,6 @@
 
 const DYNAMISCHE_ENERGIE_PRIJS_ID = 'adc99ffc-add2-40d0-b664-8ce3b19c28af'; // Power by the Hour: NL_Netherlands
 
-// All-in prijs = kale prijs (incl. Frank Energie opslag) + energiebelasting, incl. BTW
-const ENERGIEBELASTING_PER_KWH = 0.0916; // excl. BTW, overheidstarief 2026
-const BTW_FACTOR = 1.21;
-
 // --------------------------
 // Hulpfuncties
 // --------------------------
@@ -27,8 +24,9 @@ function afronding(waarde, decimalen = 4) {
   return Number(Number(waarde).toFixed(decimalen));
 }
 
-function naarPrijs(kalePrijs) {
-  return afronding((kalePrijs + ENERGIEBELASTING_PER_KWH) * BTW_FACTOR, 4);
+// Power by the Hour levert al all-in prijzen: alleen afronden.
+function naarPrijs(prijs) {
+  return afronding(prijs, 4);
 }
 
 async function haalAlleLogicaVariabelen() {
