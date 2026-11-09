@@ -1,7 +1,9 @@
 'use strict';
 
 const Homey = require('homey');
-const { setGridChargePower, stopGridCharge, holdBatteryAtZero } = require('../../lib/AnkerSolixModbusReader');
+const {
+  setGridChargePower, stopGridCharge, holdBatteryAtZero, setBatteryPower,
+} = require('../../lib/AnkerSolixModbusReader');
 
 const p = v => parseFloat(v) || 0;
 
@@ -14,7 +16,7 @@ class SolarbankDevice extends Homey.Device {
     this._deviceSn = this.getStoreValue('device_sn');
 
     // Devices paired before these capabilities were added need them added explicitly.
-    for (const cap of ['measure_power', 'meter_power.charged', 'meter_power.discharged', 'grid_charge_power', 'grid_export_limit', 'ac_input_limit', 'battery_hold']) {
+    for (const cap of ['measure_power', 'meter_power.charged', 'meter_power.discharged', 'grid_charge_power', 'grid_export_limit', 'ac_input_limit', 'battery_hold', 'target_power', 'target_power_mode']) {
       if (!this.hasCapability(cap)) {
         await this.addCapability(cap).catch(err => this.error(`addCapability ${cap}:`, err.message));
       }
@@ -45,6 +47,17 @@ class SolarbankDevice extends Homey.Device {
     this.registerCapabilityListener('battery_hold',        v => this.setBatteryHold(v));
     this.registerCapabilityListener('grid_export_limit',   v => this.setGridExportLimit(v));
     this.registerCapabilityListener('ac_input_limit',      v => this.setAcInputLimit(v));
+    this.registerCapabilityListener('target_power',        v => this.setTargetPower(v));
+    this.registerCapabilityListener('target_power_mode',   v => this.setTargetPowerMode(v));
+
+    // Devices added before target_power existed have no mode yet. If the app
+    // restarted while Homey/EMS was in control, re-arm the failsafe so the
+    // battery doesn't stay stuck on an old setpoint if the EMS never returns.
+    if (this._getCap('target_power_mode') == null) {
+      this._set('target_power_mode', 'device');
+    } else if (this._getCap('target_power_mode') === 'homey') {
+      this._armTargetPowerWatchdog();
+    }
 
     // Subscribe to poll results
     this._onUpdate = this._onUpdate.bind(this);
@@ -239,6 +252,75 @@ class SolarbankDevice extends Homey.Device {
     this._set('ac_input_limit', watts);
   }
 
+  // ─── Homey target power (used by Homey Energy / external EMS apps) ──────
+
+  _modbusTarget() {
+    if (this.homey.settings.get('connection_mode') !== 'modbus') {
+      throw new Error('Target power control requires Modbus mode (see app settings)');
+    }
+    const host = this.homey.settings.get('modbus_ip');
+    const port = Number(this.homey.settings.get('modbus_port')) || 502;
+    if (!host) throw new Error('No Modbus IP configured in app settings');
+    return { host, port };
+  }
+
+  /**
+   * Homey target_power convention: positive = charge, negative = discharge,
+   * 0 = hold the battery at 0W. Puts the device in third-party-control mode
+   * and (re)arms the failsafe that returns it to self-consumption.
+   */
+  async setTargetPower(watts) {
+    const w = Math.round(watts);
+    this.log(`target_power: ${w} W`);
+    await setBatteryPower({ ...this._modbusTarget(), watts: w });
+
+    this._set('target_power', w);
+    this._set('target_power_mode', 'homey');
+    // Keep the older manual controls in line with what the device now does.
+    this._set('battery_hold', w === 0);
+    this._set('grid_charge_power', Math.max(w, 0));
+    this._armTargetPowerWatchdog();
+  }
+
+  async setTargetPowerMode(mode) {
+    if (mode === 'homey') {
+      let w = this._getCap('target_power');
+      if (!Number.isFinite(w)) w = 0;
+      await this.setTargetPower(w);
+      return;
+    }
+    await this._returnToSelfConsumption('mode set to automatic');
+  }
+
+  async _returnToSelfConsumption(reason) {
+    this.homey.clearTimeout(this._targetPowerWatchdog);
+    this._targetPowerWatchdog = null;
+    this.log(`Returning to self-consumption (${reason})`);
+    await stopGridCharge(this._modbusTarget());
+    this._set('target_power_mode', 'device');
+    this._set('battery_hold', false);
+    this._set('grid_charge_power', 0);
+  }
+
+  _armTargetPowerWatchdog() {
+    this.homey.clearTimeout(this._targetPowerWatchdog);
+    this._targetPowerWatchdog = null;
+    const minutes = Number(this.getSetting('target_power_timeout') ?? 15);
+    if (!(minutes > 0)) return;
+    this._targetPowerWatchdog = this.homey.setTimeout(() => {
+      this._returnToSelfConsumption(`no target power command for ${minutes} min`)
+        .catch(err => this.error('Failsafe revert failed:', err.message));
+    }, minutes * 60 * 1000);
+  }
+
+  _getCap(cap) {
+    try {
+      return this.getCapabilityValue(cap);
+    } catch (err) {
+      return null;
+    }
+  }
+
   async _setMinSoc(percent) {
     const api = this.homey.app.getApi();
     if (!api) throw new Error('Not authenticated');
@@ -255,12 +337,21 @@ class SolarbankDevice extends Homey.Device {
   }
 
   async onDeleted() {
+    this.homey.clearTimeout(this._targetPowerWatchdog);
     this.homey.removeListener('anker_solix_update', this._onUpdate);
     this.log('Solarbank deleted:', this.getName());
   }
 
-  async onSettings({ newSettings }) {
-    // No device-level settings currently
+  async onUninit() {
+    this.homey.clearTimeout(this._targetPowerWatchdog);
+  }
+
+  async onSettings({ changedKeys }) {
+    // Settings are stored after onSettings resolves, so re-arm on the next tick
+    // to pick up a new failsafe timeout while Homey is in control.
+    if (changedKeys.includes('target_power_timeout') && this._getCap('target_power_mode') === 'homey') {
+      this.homey.setTimeout(() => this._armTargetPowerWatchdog(), 0);
+    }
   }
 }
 
