@@ -2,5 +2,9 @@
   "1.1.2": {
     "en": "Homey Energy and energy management apps can now control the Solarbank Max AC battery through a target power (requires Modbus in the app settings).",
     "nl": "Homey Energy en energiebeheer-apps kunnen de accu van de Solarbank Max AC nu aansturen via een doelvermogen (vereist Modbus in de app-instellingen)."
+  },
+  "1.1.3": {
+    "en": "First release as Anker SOLIX Community, for Homey Pro. The description now explains how this app differs from the official Anker SOLIX app.",
+    "nl": "Eerste versie als Anker SOLIX Community, voor Homey Pro. De beschrijving legt nu uit hoe deze app verschilt van de officiële Anker SOLIX app."
   }
 }
