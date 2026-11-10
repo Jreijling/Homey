@@ -1,6 +1,6 @@
 {
-  "name": "com.anker.solix",
-  "version": "1.0.0",
+  "name": "com.anker.solix.community",
+  "version": "1.1.2",
   "description": "Anker Solix solar energy system for Homey",
   "main": "app.js",
   "engines": {

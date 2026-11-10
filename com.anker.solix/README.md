@@ -1,4 +1,4 @@
-# Anker Solix – Homey App
+# Anker SOLIX Community – Homey App
 
 Monitor and control your **Anker Solix** solar battery system from Homey.
 
