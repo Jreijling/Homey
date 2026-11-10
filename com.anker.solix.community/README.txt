@@ -6,6 +6,7 @@ The official app by Anker connects over your local network (Modbus TCP) and supp
 - The Anker P1 Meter and the Anker 3-phase Smart Meter (A17X7), which can act as the main meter in Homey Energy.
 - A Power System device with the totals of your whole Anker system.
 - Flows for charging and discharging starting or stopping, and grid import and export.
+Modbus works differently as well. The official app uses only Modbus and needs no cloud. In this app Modbus is optional and only for the Solarbank Max AC: it adds live values every 10 seconds and battery control, while the Anker cloud is still used for login and finding your devices. Don't let both apps control the same battery at the same time, because they would overwrite each other's settings.
 If you only have devices that the official app supports, the official app is the simpler choice: it needs no Anker account and works on Homey Cloud.
 
 Supported devices
