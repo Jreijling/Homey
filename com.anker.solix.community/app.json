@@ -290,8 +290,7 @@
       },
       "class": "battery",
       "platforms": [
-        "local",
-        "cloud"
+        "local"
       ],
       "capabilities": [
         "measure_battery",
@@ -395,8 +394,7 @@
       },
       "class": "sensor",
       "platforms": [
-        "local",
-        "cloud"
+        "local"
       ],
       "capabilities": [
         "measure_power",
@@ -486,8 +484,7 @@
       },
       "class": "other",
       "platforms": [
-        "local",
-        "cloud"
+        "local"
       ],
       "capabilities": [
         "solar_power",
