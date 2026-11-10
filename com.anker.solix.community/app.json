@@ -50,8 +50,8 @@
   "bugs": {
     "url": "https://github.com/Jreijling/Homey/issues"
   },
-  "source": "https://github.com/Jreijling/Homey/tree/main/com.anker.solix",
-  "homepage": "https://github.com/Jreijling/Homey/tree/main/com.anker.solix#readme",
+  "source": "https://github.com/Jreijling/Homey/tree/main/com.anker.solix.community",
+  "homepage": "https://github.com/Jreijling/Homey/tree/main/com.anker.solix.community#readme",
   "capabilities": {
     "solar_power": {
       "type": "number",

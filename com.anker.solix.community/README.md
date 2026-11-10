@@ -88,7 +88,7 @@ Go to **Devices** → **+** → **Anker Solix** and choose the driver you want:
 
 ```bash
 npm install -g homey
-cd com.anker.solix
+cd com.anker.solix.community
 homey app run        # run on Homey over local network
 homey app validate   # validate app.json
 ```
