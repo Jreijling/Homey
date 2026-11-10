@@ -1,0 +1,59 @@
+<header class="homey-header">
+  <h1 class="homey-title" data-i18n="repair.title"></h1>
+  <p class="homey-subtitle" data-i18n="repair.intro"></p>
+</header>
+
+<div class="homey-form">
+  <fieldset class="homey-form-radio-set" id="alfen-meters"></fieldset>
+  <button class="homey-button-primary-full" id="alfen-save" type="button" data-i18n="repair.save"></button>
+</div>
+
+<script type="application/javascript">
+  (function () {
+    var list   = document.getElementById('alfen-meters');
+    var button = document.getElementById('alfen-save');
+
+    function option(id, label, checked) {
+      var row   = document.createElement('label');
+      var input = document.createElement('input');
+      var check = document.createElement('span');
+      var text  = document.createElement('span');
+
+      row.className   = 'homey-form-radio';
+      input.className = 'homey-form-radio-input';
+      input.type      = 'radio';
+      input.name      = 'meter';
+      input.value     = id;
+      input.checked   = checked;
+      check.className = 'homey-form-radio-checkmark';
+      text.className  = 'homey-form-radio-text';
+      text.textContent = label;
+
+      row.appendChild(input);
+      row.appendChild(check);
+      row.appendChild(text);
+      list.appendChild(row);
+    }
+
+    Homey.emit('list_meters')
+      .then(function (result) {
+        option('', Homey.__('repair.none'), !result.selected);
+        result.meters.forEach(function (m) {
+          option(m.id, m.zone ? m.name + ' (' + m.zone + ')' : m.name, m.id === result.selected);
+        });
+      })
+      .catch(function (err) { Homey.alert((err && err.message) || String(err)); });
+
+    button.addEventListener('click', function () {
+      var checked = list.querySelector('input:checked');
+      button.classList.add('is-loading');
+
+      Homey.emit('select_meter', { id: checked ? checked.value : '' })
+        .then(function () { Homey.done(); })
+        .catch(function (err) {
+          button.classList.remove('is-loading');
+          Homey.alert((err && err.message) || String(err));
+        });
+    });
+  })();
+</script>
