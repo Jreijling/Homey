@@ -1,0 +1,3 @@
+# Homey build output and dependencies (all apps)
+.homeybuild/
+node_modules/
