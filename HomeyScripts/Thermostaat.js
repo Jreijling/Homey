@@ -1,14 +1,40 @@
 // ==========================
-// Thermostaat - Vakantie + Aanwezigheid + Prijs + Zon
+// Thermostaat - Vakantie + Aanwezigheid + Zon + Negatieve prijs + Accu
 // Aanwezigheid via Homey users API
 // Prijs via Dynamische Energie Prijzen (DEP) apparaat
 // Vakantie: iedereen afwezig + vakantie variabele -> minimum temperatuur
+//
+// Thuis (verwarmen):
+// 1. Zonne-overschot of negatieve all-in prijs -> BOOST
+// 2. Dure periode binnen VOORVERWARM_UREN (3u) -> BOOST (huis alvast op temperatuur)
+// 3. Duur blok -> ECO (ook met volle Accu, het huis is voorverwarmd)
+// 4. Accu leeg -> gewone prijsprogramma (goedkoop BOOST / NORMAAL)
+// 5. Anders -> NORMAAL (de Accu vangt de rest op)
+//
+// Zonne-overschot wordt bepaald uit P1 gecorrigeerd voor de Accu (Solarbank):
+//   effectief = P1 - accuVermogen   (accuVermogen: + laden, - ontladen)
+// Zonder correctie ziet P1 bijna nooit overschot: de Accu slurpt het op, en
+// als de warmtepomp draait ontlaadt de Accu zodat P1 rond 0 W blijft.
+// Laden uit het net (Accu_Laadplan) valt hierdoor ook netjes weg.
+// Zolang de Accu onder ACCU_SOC_VOORRANG_PROCENT zit krijgt de Accu voorrang:
+// dan telt Accu-laden NIET als overschot, Accu-ontladen wel als verbruik.
 // ==========================
 
 // ---------- Apparaat IDs ----------
 const THERMOSTAAT_ID = '295b3cbb-2cc4-4e4d-9996-294cdf6b2cd0';
 const P1_APPARAAT_ID = '3755a652-027b-41bb-b188-ab2ac592ee04';
 const DYNAMISCHE_ENERGIE_PRIJS_ID = 'adc99ffc-add2-40d0-b664-8ce3b19c28af'; // Power by the Hour: NL_Netherlands (Frank Energie opslag)
+const ACCU_APPARAAT_ID = 'd0b80416-826c-4db9-9a4e-163796f60d5a'; // Solarbank ("Accu")
+
+// ---------- Accu ----------
+// Onder deze laadtoestand gaat zonnestroom eerst naar de Accu, daarboven
+// mag de thermostaat het laadvermogen van de Accu als overschot gebruiken.
+const ACCU_SOC_VOORRANG_PROCENT = 70;
+
+// Accu leeg -> gewone prijsprogramma volgen. Hysterese: leeg bij <= LEEG,
+// pas weer "niet leeg" bij >= WEER_VOL. Onbekende SoC telt als leeg.
+const ACCU_LEEG_PROCENT = 10;
+const ACCU_WEER_VOL_PROCENT = 20;
 
 // ---------- Setpoints (vloerverwarming - Verwarming) ----------
 const SETPOINT_VAKANTIE = 18.0;
@@ -16,6 +42,7 @@ const SETPOINT_WEG = 19.0;
 const SETPOINT_THUIS_ECO = 19.0;
 const SETPOINT_THUIS_NORMAAL = 19.5;
 const SETPOINT_THUIS_BOOST = 20.0;
+const SETPOINT_THUIS_EXTRA = 21.0;   // zonne-overschot, negatieve prijs, voorverwarmen
 
 // ---------- Setpoints (Koeling) ----------
 const SETPOINT_KOELING_THUIS = 18.0;
@@ -39,6 +66,23 @@ const BLOKKEN_PER_DAG = 96;
 // All-in prijs komt uit de gedeelde logica-variabele 'electra_prijs' (berekend door Electra_Prijs.js)
 const PRIJS_VARIABELE = 'electra_prijs';
 
+// ---------- Voorverwarmen ----------
+// Komt er binnen VOORVERWARM_UREN een duur blok aan (en is het nu niet duur),
+// dan alvast naar BOOST. Het DEP-apparaat geeft geen rang voor komende blokken,
+// alleen prijzen (m15/m30/m45/h1/h2/h3). "Duur" = prijs >= dure drempel:
+// - geleerd: laagste prijs die vandaag in een duur blok is gezien
+// - anders geschat: daggemiddelde + VOORVERWARM_DREMPEL_FACTOR x (dagpiek - gemiddelde)
+const VOORVERWARM_UREN = 3;              // max 3: verder kijkt het DEP-apparaat niet vooruit (h3)
+const VOORVERWARM_DREMPEL_FACTOR = 0.25;
+const VOORUIT_PRIJZEN = [
+  { cap: 'meter_price_m15', minuten: 15 },
+  { cap: 'meter_price_m30', minuten: 30 },
+  { cap: 'meter_price_m45', minuten: 45 },
+  { cap: 'meter_price_h1', minuten: 60 },
+  { cap: 'meter_price_h2', minuten: 120 },
+  { cap: 'meter_price_h3', minuten: 180 }
+];
+
 // ---------- Logging ----------
 const LOG_MAX_REGELS = 40;
 const STUUR_TIJDLIJN_BIJ_WIJZIGING = true;
@@ -49,6 +93,8 @@ const LAATSTE_MODUS_VARIABELE = 'thermostaat_laatste_modus';
 const LAATSTE_DOELTEMP_VARIABELE = 'thermostaat_laatste_doeltemp';
 const LAATSTE_RESULTAAT_VARIABELE = 'thermostaat_laatste_resultaat';
 const ZONNE_BOOST_ACTIEF_VARIABELE = 'thermostaat_zonne_boost_actief';
+const ACCU_LEEG_VARIABELE = 'thermostaat_accu_leeg';
+const DUUR_DREMPEL_VARIABELE = 'thermostaat_duur_drempel'; // JSON {datum, prijs}
 
 // --------------------------
 // Hulpfuncties
@@ -181,7 +227,25 @@ const thermostaatModus = thermostaat.capabilitiesObj.thermostat_mode
   ? String(thermostaat.capabilitiesObj.thermostat_mode.value || '').toLowerCase()
   : 'heating';
 const isKoeling = (thermostaatModus === 'cooling');
-const netwerkvermogen = Number(p1.capabilitiesObj.measure_power.value);
+const p1Vermogen = Number(p1.capabilitiesObj.measure_power.value);
+
+// ---------- Accu: effectief netwerkvermogen ----------
+let accuVermogen = 0;
+let accuSoc = NaN;
+let accuBron = 'accu';
+
+try {
+  const accu = await Homey.devices.getDevice({ id: ACCU_APPARAAT_ID });
+  accuVermogen = Number(accu.capabilitiesObj?.measure_power?.value) || 0;
+  accuSoc = Number(accu.capabilitiesObj?.measure_battery?.value);
+} catch (e) {
+  accuBron = 'accu_fout: ' + e.message;
+}
+
+const accuHeeftVoorrang = Number.isFinite(accuSoc) && accuSoc < ACCU_SOC_VOORRANG_PROCENT;
+const netwerkvermogen = accuHeeftVoorrang
+  ? p1Vermogen + Math.max(0, -accuVermogen)   // Accu-laden telt niet als overschot, ontladen wel als verbruik
+  : p1Vermogen - accuVermogen;
 const uur = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Amsterdam' })).getHours();
 
 // ---------- Aanwezigheid via users API ----------
@@ -234,6 +298,55 @@ const isDuurUurPerRang = huidigePrijsRang > (BLOKKEN_PER_DAG - (DUURSTE_UREN_AAN
 // Gebruik rang als primaire (en enige) bron
 const isGoedkoopUur = isGoedkoopUurPerRang;
 const isDuurUur = isDuurUurPerRang;
+const isNegatievePrijs = huidigePrijs < 0;
+
+// ---------- Voorverwarmen: komt er een duur blok aan? ----------
+function kalePrijs(cap) {
+  const c = depCapaciteiten[cap];
+  const v = c ? Number(c.value) : NaN;
+  return Number.isFinite(v) ? v : null;
+}
+
+const vandaag = haalNuLokaal().slice(0, 10);
+const kalePrijsNu = kalePrijs('meter_price_h0');
+
+let geleerdeDrempel = null;
+try {
+  const opgeslagen = JSON.parse(await haalVariabele(DUUR_DREMPEL_VARIABELE, '{}'));
+  if (opgeslagen && opgeslagen.datum === vandaag && Number.isFinite(opgeslagen.prijs)) {
+    geleerdeDrempel = opgeslagen.prijs;
+  }
+} catch (e) {
+  geleerdeDrempel = null;
+}
+
+if (isDuurUur && kalePrijsNu !== null) {
+  geleerdeDrempel = geleerdeDrempel === null ? kalePrijsNu : Math.min(geleerdeDrempel, kalePrijsNu);
+  await stellogicaVariabeleIn(DUUR_DREMPEL_VARIABELE, 'string',
+    JSON.stringify({ datum: vandaag, prijs: geleerdeDrempel }));
+}
+
+const dagGemiddelde = kalePrijs('meter_price_this_day_avg');
+const dagHoogste = kalePrijs('meter_price_this_day_highest');
+const geschatteDrempel = (dagGemiddelde !== null && dagHoogste !== null)
+  ? dagGemiddelde + VOORVERWARM_DREMPEL_FACTOR * (dagHoogste - dagGemiddelde)
+  : null;
+const duurDrempel = geleerdeDrempel !== null ? geleerdeDrempel : geschatteDrempel;
+const duurDrempelBron = geleerdeDrempel !== null ? 'geleerd' : 'geschat';
+
+let duurBlokOver = null; // minuten tot eerstvolgende dure blok binnen venster
+if (!isDuurUur && duurDrempel !== null) {
+  for (let i = 0; i < VOORUIT_PRIJZEN.length; i++) {
+    const p = VOORUIT_PRIJZEN[i];
+    if (p.minuten > VOORVERWARM_UREN * 60) break;
+    const prijs = kalePrijs(p.cap);
+    if (prijs !== null && prijs >= duurDrempel) {
+      duurBlokOver = p.minuten;
+      break;
+    }
+  }
+}
+const isVoorverwarmen = duurBlokOver !== null;
 
 // ---------- Vakantie ----------
 const opVakantie = await haalVariabele('vakantie', false);
@@ -279,6 +392,18 @@ if (bufferbatZonneActief) {
   }
 }
 
+// ---------- Accu leeg (met hysterese) ----------
+const vorighAccuLeeg = await haalVariabele(ACCU_LEEG_VARIABELE, false);
+let accuLeeg;
+
+if (!Number.isFinite(accuSoc)) {
+  accuLeeg = true;
+} else if (vorighAccuLeeg) {
+  accuLeeg = accuSoc < ACCU_WEER_VOL_PROCENT;
+} else {
+  accuLeeg = accuSoc <= ACCU_LEEG_PROCENT;
+}
+
 // ---------- Vorige status ----------
 const vorigheModus = await haalVariabele(LAATSTE_MODUS_VARIABELE, 'ONBEKEND');
 const vorighDoeltemp = await haalVariabele(LAATSTE_DOELTEMP_VARIABELE, huidigDoeltemperatuur);
@@ -292,6 +417,8 @@ let redenen = [];
 
 redenen.push('Prijs: ' + afronding(huidigePrijs));
 redenen.push('Rang: #' + huidigePrijsRang);
+redenen.push('Accu: soc=' + (Number.isFinite(accuSoc) ? accuSoc + '%' : 'onbekend') +
+  (accuHeeftVoorrang ? ' (Accu voorrang < ' + ACCU_SOC_VOORRANG_PROCENT + '%)' : ''));
 redenen.push('Buffervat prio: ' + (bufferbatZonneActief ? 'ACTIEF' : 'inactief'));
 redenen.push(zonnebufferReden);
 
@@ -319,27 +446,43 @@ if (isKoeling) {
   redenen.push('Aanwezig: ' + aanwezigenGebruikers.length);
 
   // Prioriteit:
-  // 1. Groot zonne-overschot met buffer -> 20.0
-  // 2. Goedkoop uur -> 20.0
-  // 3. 8 duurste uren -> 19.0
-  // 4. Normaal -> 19.5
+  // 1. Zonne-overschot -> 21.0
+  // 2. Negatieve all-in prijs -> 21.0
+  // 3. Dure periode binnen VOORVERWARM_UREN -> 21.0 (voorverwarmen)
+  // 4. Duur blok -> 19.0 (ook met volle Accu: anders trekt de warmtepomp de Accu
+  //    leeg in de piek en staat hij in de dure uren gewoon te verwarmen)
+  // 5. Accu leeg -> gewone prijsprogramma (goedkoop 20.0 / anders 19.5)
+  // 6. Accu niet leeg -> 19.5 (Accu vangt de rest op)
   if (zonneBoostActief) {
     modus = 'BOOST_ZONNE';
-    doeltemp = SETPOINT_THUIS_BOOST;
+    doeltemp = SETPOINT_THUIS_EXTRA;
     redenen.push('Zonne-overschot actief');
-    if (isDuurUur) {
-      redenen.push('Zonne-overschot override');
-    }
-  } else if (isGoedkoopUur) {
-    modus = 'BOOST_GOEDKOOP';
-    doeltemp = SETPOINT_THUIS_BOOST;
+  } else if (isNegatievePrijs) {
+    modus = 'BOOST_NEGATIEF';
+    doeltemp = SETPOINT_THUIS_EXTRA;
+    redenen.push('Negatieve all-in prijs (' + afronding(huidigePrijs) + ')');
+  } else if (isVoorverwarmen) {
+    modus = 'BOOST_VOORVERWARMEN';
+    doeltemp = SETPOINT_THUIS_EXTRA;
+    redenen.push('Voorverwarmen: duur blok over ' + duurBlokOver + ' min (drempel ' +
+      afronding(duurDrempel, 4) + ', ' + duurDrempelBron + ')');
   } else if (isDuurUur) {
     modus = 'ECO_DUUR';
     doeltemp = SETPOINT_THUIS_ECO;
+    redenen.push('Duur blok (rang #' + huidigePrijsRang + '): ECO');
+  } else if (accuLeeg) {
+    redenen.push('Accu leeg: gewone prijsprogramma');
+    if (isGoedkoopUur) {
+      modus = 'BOOST_GOEDKOOP';
+      doeltemp = SETPOINT_THUIS_BOOST;
+    } else {
+      modus = 'NORMAAL';
+      doeltemp = SETPOINT_THUIS_NORMAAL;
+    }
   } else {
-    modus = 'NORMAAL';
+    modus = 'NORMAAL_ACCU';
     doeltemp = SETPOINT_THUIS_NORMAAL;
-    redenen.push('Normale thuis-situatie');
+    redenen.push('Accu niet leeg: prijs genegeerd');
   }
 }
 
@@ -370,6 +513,7 @@ if (doeltemp !== huidigDoeltemperatuur) {
 
 // Zonne-buffer status opslaan
 await stellogicaVariabeleIn(ZONNE_BOOST_ACTIEF_VARIABELE, 'boolean', zonneBoostActief);
+await stellogicaVariabeleIn(ACCU_LEEG_VARIABELE, 'boolean', accuLeeg);
 
 // --------------------------
 // Logging
@@ -388,7 +532,13 @@ const samenvatting =
   ', opVakantie=' + opVakantie +
   ', iemandThuis=' + iemandThuis +
   ', aanwezigenAantal=' + aanwezigenGebruikers.length +
-  ', netwerk=' + netwerkvermogen + 'W' +
+  ', accuSoc=' + (Number.isFinite(accuSoc) ? accuSoc : 'onbekend') +
+  ', accuVoorrang=' + accuHeeftVoorrang +
+  ', accuLeeg=' + accuLeeg +
+  ', isNegatievePrijs=' + isNegatievePrijs +
+  ', voorverwarmen=' + isVoorverwarmen +
+  ', duurBlokOver=' + duurBlokOver +
+  ', duurDrempel=' + (duurDrempel !== null ? afronding(duurDrempel, 4) : 'onbekend') + '(' + duurDrempelBron + ')' +
   ', huidigePrijs=' + afronding(huidigePrijs) +
   ', rangVandaag=' + huidigePrijsRang + '/' + BLOKKEN_PER_DAG +
   ', zonneBoostActief=' + zonneBoostActief +
@@ -421,7 +571,7 @@ if (STUUR_TIJDLIJN_BIJ_WIJZIGING && (gewijzigd || modusGewijzigd || doeltempGewi
     ', prijs ' + afronding(huidigePrijs) +
     ', rang: ' + huidigePrijsRang +
     ', thuis: ' + iemandThuis +
-    ', netwerk: ' + netwerkvermogen + 'W)';
+    ', accu: ' + (Number.isFinite(accuSoc) ? accuSoc + '%' : '?') + ')';
 
   tijdlijnVerstuurd = await voegTijdlijnToe(tijdlijnTekst);
 }
@@ -439,6 +589,19 @@ return {
   aanwezigenGebruikers: aanwezigenGebruikers,
   aanwezigenAantal: aanwezigenGebruikers.length,
   netwerk: netwerkvermogen,
+  p1Vermogen: p1Vermogen,
+  accuVermogen: accuVermogen,
+  accuSoc: Number.isFinite(accuSoc) ? accuSoc : null,
+  accuHeeftVoorrang: accuHeeftVoorrang,
+  accuSocVoorrangDrempel: ACCU_SOC_VOORRANG_PROCENT,
+  accuBron: accuBron,
+  accuLeeg: accuLeeg,
+  isNegatievePrijs: isNegatievePrijs,
+  isVoorverwarmen: isVoorverwarmen,
+  duurBlokOver: duurBlokOver,
+  duurDrempel: duurDrempel,
+  duurDrempelBron: duurDrempelBron,
+  kalePrijsNu: kalePrijsNu,
   huidigePrijs: huidigePrijs,
   rangVandaag: huidigePrijsRang,
   huidigDoeltemp: huidigDoeltemperatuur,

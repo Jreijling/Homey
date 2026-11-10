@@ -121,6 +121,25 @@ async function holdBatteryAtZero({ host, port = 502 }) {
   }
 }
 
+/**
+ * Sets a signed battery power setpoint using the Homey target_power
+ * convention: positive = charge, negative = discharge, 0 = hold at 0W.
+ * The register uses the opposite sign (negative = charge), and a literal 0
+ * would fall back to self-consumption, so 0 is written as 1W (see
+ * holdBatteryAtZero).
+ */
+async function setBatteryPower({ host, port = 502, watts }) {
+  const w = Math.round(watts);
+  const registerValue = w === 0 ? 1 : -w;
+  const client = new ModbusClient({ host, port });
+  try {
+    await client.writeSingleRegister(REG_OPERATING_MODE, OPERATING_MODE_THIRD_PARTY_CONTROL);
+    await client.writeMultipleRegisters(REG_BATTERY_POWER_SETPOINT, fromInt32(registerValue));
+  } finally {
+    client.close();
+  }
+}
+
 module.exports = {
-  readModbusSnapshot, setGridChargePower, stopGridCharge, holdBatteryAtZero,
+  readModbusSnapshot, setGridChargePower, stopGridCharge, holdBatteryAtZero, setBatteryPower,
 };

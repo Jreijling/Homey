@@ -1,7 +1,7 @@
 {
   "id": "com.anker.solix",
   "version": "1.1.1",
-  "compatibility": ">=12.0.0",
+  "compatibility": ">=12.13.0",
   "sdk": 3,
   "platforms": ["local", "cloud"],
   "brandColor": "#0066CC",
@@ -237,7 +237,9 @@
         "output_preset_power",
         "battery_min_soc",
         "grid_export_enabled",
-        "battery_hold"
+        "battery_hold",
+        "target_power",
+        "target_power_mode"
       ],
       "capabilitiesOptions": {
         "measure_battery": {
@@ -251,8 +253,28 @@
         },
         "meter_power.discharged": {
           "title": { "en": "Total Discharged", "nl": "Totaal ontladen" }
+        },
+        "target_power": {
+          "min": -3500,
+          "max": 3500,
+          "step": 10
         }
       },
+      "settings": [
+        {
+          "id": "target_power_timeout",
+          "type": "number",
+          "label": { "en": "Target power failsafe (minutes)", "nl": "Doelvermogen failsafe (minuten)" },
+          "hint": {
+            "en": "When no new target power command arrives (e.g. from an EMS) within this time, the battery returns to its own self-consumption mode. 0 = disabled (default). Leave at 0 for an EMS that only sends a command when the setpoint changes, such as Ultimate EMS: otherwise the battery drops out of EMS control during a long steady setpoint.",
+            "nl": "Als er binnen deze tijd geen nieuw doelvermogen-commando binnenkomt (bijv. van een EMS), gaat de accu terug naar zijn eigen zelfconsumptiemodus. 0 = uit (standaard). Laat op 0 staan bij een EMS die alleen een commando stuurt als het setpoint verandert, zoals Ultimate EMS: anders valt de accu tijdens een lang gelijk setpoint uit de EMS-aansturing."
+          },
+          "value": 0,
+          "min": 0,
+          "max": 1440,
+          "units": { "en": "min" }
+        }
+      ],
       "energy": {
         "homeBattery": true,
         "meterPowerImportedCapability": "meter_power.charged",

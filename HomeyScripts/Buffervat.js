@@ -4,8 +4,8 @@
 // 1. Vakantie -> minimum temperatuur (geen zonne-boost, geen negatieve-prijs-boost)
 // 2. Negatieve all-in prijs -> BOOST 56°C (verbruiken loont, overschrijft ECO)
 // 3. 8 duurste uren -> ECO (zon genegeerd, terugleveren loont meer)
-// 4. Zonne-overschot ÉN 10 goedkoopste uren tegelijk -> BOOST 56°C
-// 5. Alleen 10 goedkoopste uren (geen zon) -> BOOST 52°C
+// 4. Zonne-overschot ÉN 6 goedkoopste uren tegelijk -> BOOST 56°C
+// 5. Alleen 6 goedkoopste uren (geen zon) -> BOOST 52°C
 // 6. Anders (incl. zon zonder goedkoop uur) -> NORMAAL (zon gaat terug het net op)
 //
 // Zonne-overschot wordt gedetecteerd via de P1 (netto export) ÉN via het
@@ -412,8 +412,8 @@ redenen.push(zonnebufferReden);
 // 1. vakantie -> VAKANTIE (minimum, geen zonne-boost, geen negatieve-prijs-boost)
 // 2. negatieve all-in prijs -> BOOST_NEGATIEF (56°C, overschrijft ECO — verbruiken loont letterlijk)
 // 3. duurste 8 uren -> ECO (zonne-overschot NIET gebruikt: stroom verkopen loont meer)
-// 4. zonne-overschot ÉN goedkoopste 10 uren tegelijk -> BOOST_ZONNE_PRIJS (56°C)
-// 5. alleen goedkoopste 10 uren (geen zon) -> BOOST_GOEDKOOP (52°C)
+// 4. zonne-overschot ÉN goedkoopste 6 uren tegelijk -> BOOST_ZONNE_PRIJS (56°C)
+// 5. alleen goedkoopste 6 uren (geen zon) -> BOOST_GOEDKOOP (52°C)
 // 6. anders -> NORMAAL
 // Let op: zonneBoostActief is al forecast-gated (SOLAR_FORECAST_SKIP_BOOST_KWH), dus
 // BOOST_ZONNE_PRIJS vereist zowel voldoende zon-forecast als een goedkoop uur.
