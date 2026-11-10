@@ -305,7 +305,7 @@ class SolarbankDevice extends Homey.Device {
   _armTargetPowerWatchdog() {
     this.homey.clearTimeout(this._targetPowerWatchdog);
     this._targetPowerWatchdog = null;
-    const minutes = Number(this.getSetting('target_power_timeout') ?? 15);
+    const minutes = Number(this.getSetting('target_power_timeout') ?? 0);
     if (!(minutes > 0)) return;
     this._targetPowerWatchdog = this.homey.setTimeout(() => {
       this._returnToSelfConsumption(`no target power command for ${minutes} min`)
