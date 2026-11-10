@@ -81,7 +81,8 @@ Go to **Devices** → **+** → **Anker Solix** and choose the driver you want:
 - Data is polled from the **Anker Power Cloud API** (default: every 60 s, configurable).
 - Authentication uses ECDH key exchange + AES-256-CBC, mirroring the official Anker app protocol.
 - Only **one active session per account** is allowed by Anker. If you are logged in on the Anker mobile app at the same time, the integration may be kicked out.
-- No local/LAN communication – a cloud connection is required.
+- A cloud connection is required for monitoring.
+- Battery control (`target_power`, battery hold, grid charging) on the **Solarbank Max AC** uses **local Modbus TCP**. Enable Modbus in the app settings and enter the Solarbank's IP address.
 
 ## Development
 

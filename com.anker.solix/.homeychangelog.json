@@ -1,0 +1,6 @@
+{
+  "1.1.2": {
+    "en": "Homey Energy and energy management apps can now control the Solarbank Max AC battery through a target power (requires Modbus in the app settings).",
+    "nl": "Homey Energy en energiebeheer-apps kunnen de accu van de Solarbank Max AC nu aansturen via een doelvermogen (vereist Modbus in de app-instellingen)."
+  }
+}

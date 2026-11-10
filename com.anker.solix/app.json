@@ -26,8 +26,10 @@
     "email": "jeroen@reijling.nl"
   },
   "bugs": {
-    "url": "https://github.com/jreijling/com.anker.solix/issues"
+    "url": "https://github.com/Jreijling/Homey/issues"
   },
+  "source": "https://github.com/Jreijling/Homey/tree/main/com.anker.solix",
+  "homepage": "https://github.com/Jreijling/Homey/tree/main/com.anker.solix#readme",
   "capabilities": {
     "solar_power": {
       "type": "number",
