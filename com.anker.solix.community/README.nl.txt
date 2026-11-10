@@ -1,13 +1,14 @@
 Volg je Anker SOLIX thuisaccu, zonne-energie en slimme meter in Homey via je Anker-account, en laat Homey Energy de accu aansturen.
 
 Verschil met de officiële Anker SOLIX app
-De officiële app van Anker werkt via je lokale netwerk (Modbus TCP) en ondersteunt de Solarbank Max AC, Solarbank Max, XE (AC), Solarbank 4 E5000 Pro, Smart Meter Gen 2 en Smart Plug Gen 2. Deze community-app werkt via de Anker-cloud en ondersteunt daardoor ook apparaten die de officiële app niet kent:
+De officiële app van Anker werkt via je lokale netwerk (Modbus TCP) en ondersteunt de Solarbank Max AC, Solarbank Max, XE (AC), Solarbank 4 E5000 Pro, Smart Meter Gen 2 en Smart Plug Gen 2. Deze community-app werkt via de Anker-cloud en kan daardoor dingen die de officiële app niet kan:
+- Op de Solarbank Max AC: het maximale terugleververmogen en het maximale AC-ingangsvermogen instellen. Deze instellingen zijn niet via Modbus beschikbaar, dus de officiële app kan ze niet wijzigen.
 - Oudere Solarbanks zonder Modbus: E1600 (Solarbank 1), Solarbank 2 Pro, 2 AC, 2 Plus en Solarbank 3 E2700 Pro.
-- De Anker P1 Meter en de Anker 3-fase Smart Meter (A17X7), die als hoofdmeter in Homey Energy kunnen dienen.
+- De Anker P1 Meter en de Anker 3-fase Smart Meter (A17X7), met updates ongeveer elke 5 seconden, die als hoofdmeter in Homey Energy kunnen dienen.
 - Een Power System-apparaat met de totalen van je hele Anker-systeem.
 - Flows voor het starten of stoppen van laden en ontladen, en voor import en export van het net.
 Ook Modbus werkt anders. De officiële app gebruikt alleen Modbus en heeft geen cloud nodig. In deze app is Modbus optioneel en alleen voor de Solarbank Max AC: het voegt elke 10 seconden live waarden en accu-aansturing toe, terwijl de Anker-cloud nodig blijft voor het inloggen en het vinden van je apparaten. Laat niet beide apps tegelijk dezelfde accu aansturen, want dan overschrijven ze elkaars instellingen.
-Heb je alleen apparaten die de officiële app ondersteunt, kies dan de officiële app: die heeft geen Anker-account nodig en werkt ook op Homey Cloud.
+Heb je alleen de functies van de officiële app nodig, dan is die de eenvoudigste keuze: die heeft geen Anker-account nodig en werkt ook op Homey Cloud.
 
 Ondersteunde apparaten
 - Solarbank: E1600, Solarbank 2 Pro, 2 AC, 2 Plus, Solarbank 3 E2700 Pro en Solarbank Max AC. Toont accuniveau, zonnevermogen, laad- en ontlaadvermogen, AC-uitvoer en de totale geladen en ontladen energie.

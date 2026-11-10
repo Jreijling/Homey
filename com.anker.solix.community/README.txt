@@ -1,13 +1,14 @@
 Monitor your Anker SOLIX home battery, solar input and smart meter in Homey through your Anker account, and let Homey Energy control the battery.
 
 How this app differs from the official Anker SOLIX app
-The official app by Anker connects over your local network (Modbus TCP) and supports the Solarbank Max AC, Solarbank Max, XE (AC), Solarbank 4 E5000 Pro, Smart Meter Gen 2 and Smart Plug Gen 2. This community app connects through the Anker cloud instead, so it also works with devices the official app does not support:
+The official app by Anker connects over your local network (Modbus TCP) and supports the Solarbank Max AC, Solarbank Max, XE (AC), Solarbank 4 E5000 Pro, Smart Meter Gen 2 and Smart Plug Gen 2. This community app connects through the Anker cloud instead, so it can do things the official app cannot:
+- On the Solarbank Max AC: set the maximum grid feed-in power and the maximum AC input power. These settings are not available over Modbus, so the official app cannot change them.
 - Older Solarbanks without Modbus: E1600 (Solarbank 1), Solarbank 2 Pro, 2 AC, 2 Plus and Solarbank 3 E2700 Pro.
-- The Anker P1 Meter and the Anker 3-phase Smart Meter (A17X7), which can act as the main meter in Homey Energy.
+- The Anker P1 Meter and the Anker 3-phase Smart Meter (A17X7), with updates about every 5 seconds, which can act as the main meter in Homey Energy.
 - A Power System device with the totals of your whole Anker system.
 - Flows for charging and discharging starting or stopping, and grid import and export.
 Modbus works differently as well. The official app uses only Modbus and needs no cloud. In this app Modbus is optional and only for the Solarbank Max AC: it adds live values every 10 seconds and battery control, while the Anker cloud is still used for login and finding your devices. Don't let both apps control the same battery at the same time, because they would overwrite each other's settings.
-If you only have devices that the official app supports, the official app is the simpler choice: it needs no Anker account and works on Homey Cloud.
+If you only need the features the official app offers, it is the simpler choice: it needs no Anker account and works on Homey Cloud.
 
 Supported devices
 - Solarbank: E1600, Solarbank 2 Pro, 2 AC, 2 Plus, Solarbank 3 E2700 Pro and Solarbank Max AC. Shows battery level, solar power, charge and discharge power, AC output and total charged and discharged energy.
