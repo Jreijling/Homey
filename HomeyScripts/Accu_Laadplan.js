@@ -211,6 +211,6 @@ const timeline = `🔋 Laadplan ${target.date}${CFG.DRY_RUN ? ' [TEST]' : ''}: `
   + (chosen.length ? `${r2(plannedGrid)} kWh laden ${ranges.map(x => `${hhmm(x.start)}–${hhmm(x.end)}`).join(', ')}, gem. €${r2(avgChosen)} → ~${plan.targetSoc}%` : 'niet laden')
   + `. SoC nu ${soc}%, zon ${r2(pvForecast)} kWh, ochtendpiek tot ${hhmm(morningEnd)} vraagt ${Math.round(mustSoc)}%`
   + (reason !== 'ok' ? ` (${reason})` : '') + '.';
-try { await Homey.notifications.createNotification({ excerpt: timeline }); }
+try { await Homey.flow.runFlowCardAction({ uri: 'homey:flowcardaction:homey:manager:notifications:create_notification', id: 'homey:manager:notifications:create_notification', args: { text: timeline } }); }
 catch (e) { log('Tijdlijnmelding mislukt: ' + e.message); }
 return true;
