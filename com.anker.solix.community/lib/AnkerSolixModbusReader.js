@@ -69,6 +69,52 @@ const REG_BATTERY_POWER_SETPOINT  = 10071;
 const OPERATING_MODE_SELF_CONSUMPTION = 0;
 const OPERATING_MODE_THIRD_PARTY_CONTROL = 3;
 
+// Input register (0x8006) with one bit per operating mode the device
+// currently allows; Anker's config filters the mode list on it.
+const REG_EMS_MODE_MASK = 32774;
+const OPERATING_MODES = [
+  { value: 0, bit: 0, name: 'self-consumption' },
+  { value: 1, bit: 1, name: 'time-of-use' },
+  { value: 4, bit: 2, name: 'custom' },
+  { value: 6, bit: 3, name: 'smart' },
+  { value: 5, bit: 4, name: 'socket overlay' },
+  { value: 3, bit: 5, name: 'third-party control' },
+  { value: 7, bit: 6, name: 'dynamic pricing' },
+];
+const modeName = value => OPERATING_MODES.find(m => m.value === value)?.name ?? `unknown (${value})`;
+
+/**
+ * Switches to third-party-control mode. When the device refuses, reads its
+ * current mode and allowed-mode mask so the error says what is blocking it
+ * instead of a bare Modbus exception.
+ */
+async function enterThirdPartyControl(client) {
+  try {
+    await client.writeSingleRegister(REG_OPERATING_MODE, OPERATING_MODE_THIRD_PARTY_CONTROL);
+  } catch (err) {
+    if (!/^Modbus exception/.test(err.message)) throw err;
+
+    let detail = '';
+    try {
+      const [current] = await client.readHoldingRegisters(REG_OPERATING_MODE, 1);
+      detail += ` Current mode: ${modeName(current)}.`;
+    } catch (e) { /* best effort */ }
+    try {
+      const [mask] = await client.readInputRegisters(REG_EMS_MODE_MASK, 1);
+      const allowed = OPERATING_MODES.filter(m => mask & (1 << m.bit)).map(m => m.name);
+      detail += ` Allowed modes: ${allowed.join(', ') || 'none'} (mask 0x${mask.toString(16)}).`;
+    } catch (e) { /* best effort */ }
+
+    throw new Error(
+      `The battery refused third-party control (${err.message}).${detail}`
+      + ' Check that the Modbus IP in the app settings is the Solarbank Max AC (another device'
+      + ' on that address answers with this same error), then Third-Party Control Settings >'
+      + ' Modbus TCP in the Anker app, and turn off'
+      + ' Backup SOC, SOC calibration, fast charging, Storm Guard and any charging plan.',
+    );
+  }
+}
+
 /**
  * Forces the battery to charge from the grid at the given wattage by
  * switching to third-party-control mode and writing a negative power
@@ -78,7 +124,7 @@ const OPERATING_MODE_THIRD_PARTY_CONTROL = 3;
 async function setGridChargePower({ host, port = 502, watts }) {
   const client = new ModbusClient({ host, port });
   try {
-    await client.writeSingleRegister(REG_OPERATING_MODE, OPERATING_MODE_THIRD_PARTY_CONTROL);
+    await enterThirdPartyControl(client);
     await client.writeMultipleRegisters(REG_BATTERY_POWER_SETPOINT, fromInt32(-Math.abs(watts)));
   } finally {
     client.close();
@@ -109,7 +155,7 @@ async function stopGridCharge({ host, port = 502 }) {
 async function holdBatteryAtZero({ host, port = 502 }) {
   const client = new ModbusClient({ host, port });
   try {
-    await client.writeSingleRegister(REG_OPERATING_MODE, OPERATING_MODE_THIRD_PARTY_CONTROL);
+    await enterThirdPartyControl(client);
     // A literal 0 setpoint is treated by the firmware as a "no override"
     // sentinel and falls straight back to self-consumption (verified live:
     // discharge kept tracking load exactly). A 1W setpoint is honoured as a
@@ -133,7 +179,7 @@ async function setBatteryPower({ host, port = 502, watts }) {
   const registerValue = w === 0 ? 1 : -w;
   const client = new ModbusClient({ host, port });
   try {
-    await client.writeSingleRegister(REG_OPERATING_MODE, OPERATING_MODE_THIRD_PARTY_CONTROL);
+    await enterThirdPartyControl(client);
     await client.writeMultipleRegisters(REG_BATTERY_POWER_SETPOINT, fromInt32(registerValue));
   } finally {
     client.close();
