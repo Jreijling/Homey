@@ -105,6 +105,8 @@ class SolarbankDevice extends Homey.Device {
       }
     }
 
+    this._refreshGridExport();
+
     // ── Site-level values from solarbank_info ──
     this._set('battery_discharge_power', p(device?.bat_discharge_power ?? sbInfo.battery_discharge_power));
 
@@ -132,6 +134,30 @@ class SolarbankDevice extends Homey.Device {
     this._wasDischarging = isDischarging;
   }
 
+  /**
+   * grid_export_enabled has no field in the polled scene data, so read the
+   * device's switch_0w attribute from the cloud at most every 5 minutes.
+   * switch_0w = 1 means "0W switch ON" (no export); 0 = export allowed.
+   */
+  _refreshGridExport() {
+    const now = Date.now();
+    if (this._gridExportReadAt && now - this._gridExportReadAt < 5 * 60 * 1000) return;
+    this._gridExportReadAt = now;
+
+    const api = this.homey.app.getApi();
+    if (!api) return;
+    api.getDeviceAttrs(this._deviceSn, ['switch_0w'])
+      .then(attrs => {
+        const raw = attrs?.switch_0w;
+        if (raw == null || raw === '') {
+          this.log('switch_0w not returned by get_device_attrs:', JSON.stringify(attrs));
+          return;
+        }
+        this._set('grid_export_enabled', Number(raw) === 0);
+      })
+      .catch(err => this.error('Reading switch_0w failed:', err.message));
+  }
+
   _set(cap, value) {
     this.setCapabilityValue(cap, value).catch(err => this.error(`set ${cap}:`, err.message));
   }
@@ -154,6 +180,7 @@ class SolarbankDevice extends Homey.Device {
     // switch_0w = 1 means "0W switch ON" (no export); 0 = export allowed
     await api.setDeviceAttrs(this._deviceSn, { switch_0w: enabled ? 0 : 1 });
     this._set('grid_export_enabled', enabled);
+    this._gridExportReadAt = Date.now(); // don't overwrite with a stale cloud read right away
     await this.homey.app.refreshNow();
   }
 
