@@ -24,6 +24,7 @@ const CFG = {
   DRY_RUN: false,        // true = alleen plannen, niet laden
 };
 const ACCU = '46654c7d-d07d-4c4e-8db2-0ec0f1a2c825';  // Accu (Anker Solix community-app)
+const ACCU_SIGMA = '60d84a7c-088e-48fc-a99d-929a31d4d198'; // Accu_Σ (PBTH): accuvermogen per uur, + = laden; vult gaten in de accu-historie
 const SOLAR = '865bc38a-e913-4771-aec7-b6bc7ab46b6a';
 const GRID = '3755a652-027b-41bb-b188-ab2ac592ee04';   // HomeWizard P1 (+ = afname)
 const EV = 'dac34f15-df55-42fc-921c-30377b5480aa';     // Alfen laadpaal (apart gepland door EMS)
@@ -58,9 +59,10 @@ const etaC = Math.sqrt(CFG.RTE);
 // 1. Huisverbruik per uur (lokale tijd) uit de afgelopen hele dagen, zonder auto-laden
 let loadW = Array(24).fill(CFG.LOAD_FALLBACK_W), loadInfo = 'vast';
 try {
-  // Accu-historie mag ontbreken (nieuw device). Zonder accuwaarde is het verbruik van dat moment
-  // onbekend (ontladen verlaagt de netafname), dus die momenten slaan we over i.p.v. 0 aan te nemen.
-  const [grid, pv, bat, ev] = await Promise.all([hourly(GRID, 'energy_power'), hourly(SOLAR, 'energy_power'), hourly(ACCU, 'energy_power').catch(() => new Map()), hourly(EV, 'energy_power').catch(() => new Map())]);
+  // Accu-historie mag ontbreken (nieuw device): dan Accu_Σ als bron. Zonder accuwaarde is het verbruik
+  // van dat moment onbekend (ontladen verlaagt de netafname), dus die momenten slaan we over.
+  const [grid, pv, batDev, batSigma, ev] = await Promise.all([hourly(GRID, 'energy_power'), hourly(SOLAR, 'energy_power'), hourly(ACCU, 'energy_power').catch(() => new Map()), hourly(ACCU_SIGMA, 'measure_watt_avg').catch(() => new Map()), hourly(EV, 'energy_power').catch(() => new Map())]);
+  const bat = new Map([...batSigma, ...batDev]);   // accu-device gaat voor waar het een waarde heeft
   const days = [...new Set([...grid.keys()].map(t => local(new Date(t)).date))].filter(d => d !== now.date).sort().slice(-CFG.LOAD_DAYS);
   const buckets = Array.from({ length: 24 }, () => []);
   for (const [t, g] of grid) {
@@ -209,6 +211,6 @@ const timeline = `🔋 Laadplan ${target.date}${CFG.DRY_RUN ? ' [TEST]' : ''}: `
   + (chosen.length ? `${r2(plannedGrid)} kWh laden ${ranges.map(x => `${hhmm(x.start)}–${hhmm(x.end)}`).join(', ')}, gem. €${r2(avgChosen)} → ~${plan.targetSoc}%` : 'niet laden')
   + `. SoC nu ${soc}%, zon ${r2(pvForecast)} kWh, ochtendpiek tot ${hhmm(morningEnd)} vraagt ${Math.round(mustSoc)}%`
   + (reason !== 'ok' ? ` (${reason})` : '') + '.';
-try { await Homey.flow.runFlowCardAction({ uri: 'homey:manager:notifications', id: 'create_notification', args: { text: timeline } }); }
+try { await Homey.notifications.createNotification({ excerpt: timeline }); }
 catch (e) { log('Tijdlijnmelding mislukt: ' + e.message); }
 return true;
