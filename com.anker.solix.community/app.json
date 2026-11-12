@@ -1,20 +1,41 @@
 {
-  "id": "com.anker.solix",
-  "version": "1.1.1",
+  "id": "com.anker.solix.community",
+  "version": "1.1.3",
   "compatibility": ">=12.13.0",
   "sdk": 3,
-  "platforms": ["local", "cloud"],
+  "platforms": [
+    "local"
+  ],
   "brandColor": "#0066CC",
-  "name": { "en": "Anker Solix", "nl": "Anker Solix" },
+  "name": {
+    "en": "Anker SOLIX Community",
+    "nl": "Anker SOLIX Community"
+  },
   "description": {
-    "en": "Monitor and control your Anker Solix solar energy system",
-    "nl": "Bewaak en beheer uw Anker Solix zonne-energiesysteem"
+    "en": "Anker SOLIX via your Anker account, including Solarbank 1, 2 and 3 and the P1 Meter",
+    "nl": "Anker SOLIX via je Anker-account, ook Solarbank 1, 2 en 3 en de P1 Meter"
   },
   "tags": {
-    "en": ["solar", "battery", "energy", "anker", "solix", "solarbank"],
-    "nl": ["zonne-energie", "batterij", "energie", "anker", "solix", "solarbank"]
+    "en": [
+      "solar",
+      "battery",
+      "energy",
+      "anker",
+      "solix",
+      "solarbank"
+    ],
+    "nl": [
+      "zonne-energie",
+      "batterij",
+      "energie",
+      "anker",
+      "solix",
+      "solarbank"
+    ]
   },
-  "category": ["energy"],
+  "category": [
+    "energy"
+  ],
   "permissions": [],
   "images": {
     "small": "/assets/images/small.png",
@@ -26,12 +47,17 @@
     "email": "jeroen@reijling.nl"
   },
   "bugs": {
-    "url": "https://github.com/jreijling/com.anker.solix/issues"
+    "url": "https://github.com/Jreijling/Homey/issues"
   },
+  "source": "https://github.com/Jreijling/Homey/tree/main/com.anker.solix.community",
+  "homepage": "https://github.com/Jreijling/Homey/tree/main/com.anker.solix.community#readme",
   "capabilities": {
     "solar_power": {
       "type": "number",
-      "title": { "en": "Solar Power", "nl": "Zonnestroom" },
+      "title": {
+        "en": "Solar Power",
+        "nl": "Zonnestroom"
+      },
       "units": "W",
       "getable": true,
       "setable": false,
@@ -45,7 +71,10 @@
     },
     "battery_charge_power": {
       "type": "number",
-      "title": { "en": "Battery Charge Power", "nl": "Batterij oplaadvermogen" },
+      "title": {
+        "en": "Battery Charge Power",
+        "nl": "Batterij oplaadvermogen"
+      },
       "units": "W",
       "getable": true,
       "setable": false,
@@ -59,7 +88,10 @@
     },
     "battery_discharge_power": {
       "type": "number",
-      "title": { "en": "Battery Discharge Power", "nl": "Batterij ontlaadvermogen" },
+      "title": {
+        "en": "Battery Discharge Power",
+        "nl": "Batterij ontlaadvermogen"
+      },
       "units": "W",
       "getable": true,
       "setable": false,
@@ -73,7 +105,10 @@
     },
     "ac_output_power": {
       "type": "number",
-      "title": { "en": "AC Output Power", "nl": "AC uitgangsvermogen" },
+      "title": {
+        "en": "AC Output Power",
+        "nl": "AC uitgangsvermogen"
+      },
       "units": "W",
       "getable": true,
       "setable": false,
@@ -87,7 +122,10 @@
     },
     "grid_charge_power": {
       "type": "number",
-      "title": { "en": "Grid Charge Power", "nl": "Netlaadvermogen" },
+      "title": {
+        "en": "Grid Charge Power",
+        "nl": "Netlaadvermogen"
+      },
       "units": "W",
       "getable": true,
       "setable": true,
@@ -101,7 +139,10 @@
     },
     "grid_export_limit": {
       "type": "number",
-      "title": { "en": "Max Grid Export Power", "nl": "Maximaal vermogen naar het net" },
+      "title": {
+        "en": "Max Grid Export Power",
+        "nl": "Maximaal vermogen naar het net"
+      },
       "units": "W",
       "getable": true,
       "setable": true,
@@ -115,7 +156,10 @@
     },
     "ac_input_limit": {
       "type": "number",
-      "title": { "en": "Max AC Input Power", "nl": "Maximaal invoervermogen" },
+      "title": {
+        "en": "Max AC Input Power",
+        "nl": "Maximaal invoervermogen"
+      },
       "units": "W",
       "getable": true,
       "setable": true,
@@ -129,7 +173,10 @@
     },
     "output_preset_power": {
       "type": "number",
-      "title": { "en": "Output Power Target", "nl": "Uitgangsvermogen doel" },
+      "title": {
+        "en": "Output Power Target",
+        "nl": "Uitgangsvermogen doel"
+      },
       "units": "W",
       "getable": true,
       "setable": true,
@@ -143,7 +190,10 @@
     },
     "battery_min_soc": {
       "type": "number",
-      "title": { "en": "Min Battery SOC", "nl": "Min. batterijlading" },
+      "title": {
+        "en": "Min Battery SOC",
+        "nl": "Min. batterijlading"
+      },
       "units": "%",
       "getable": true,
       "setable": true,
@@ -157,7 +207,10 @@
     },
     "grid_export_enabled": {
       "type": "boolean",
-      "title": { "en": "Grid Export", "nl": "Netexport" },
+      "title": {
+        "en": "Grid Export",
+        "nl": "Netexport"
+      },
       "getable": true,
       "setable": true,
       "insights": false,
@@ -166,7 +219,10 @@
     },
     "battery_hold": {
       "type": "boolean",
-      "title": { "en": "Hold Battery (0W)", "nl": "Accu vasthouden (0W)" },
+      "title": {
+        "en": "Hold Battery (0W)",
+        "nl": "Accu vasthouden (0W)"
+      },
       "getable": true,
       "setable": true,
       "insights": false,
@@ -175,7 +231,10 @@
     },
     "home_load_power": {
       "type": "number",
-      "title": { "en": "Home Load", "nl": "Thuisverbruik" },
+      "title": {
+        "en": "Home Load",
+        "nl": "Thuisverbruik"
+      },
       "units": "W",
       "getable": true,
       "setable": false,
@@ -189,7 +248,10 @@
     },
     "grid_import_power": {
       "type": "number",
-      "title": { "en": "Grid Import Power", "nl": "Nettimportvermogen" },
+      "title": {
+        "en": "Grid Import Power",
+        "nl": "Nettimportvermogen"
+      },
       "units": "W",
       "getable": true,
       "setable": false,
@@ -203,7 +265,10 @@
     },
     "grid_export_power": {
       "type": "number",
-      "title": { "en": "Grid Export Power", "nl": "Netexportvermogen" },
+      "title": {
+        "en": "Grid Export Power",
+        "nl": "Netexportvermogen"
+      },
       "units": "W",
       "getable": true,
       "setable": false,
@@ -219,9 +284,14 @@
   "drivers": [
     {
       "id": "solarbank",
-      "name": { "en": "Solarbank", "nl": "Solarbank" },
+      "name": {
+        "en": "Solarbank",
+        "nl": "Solarbank"
+      },
       "class": "battery",
-      "platforms": ["local", "cloud"],
+      "platforms": [
+        "local"
+      ],
       "capabilities": [
         "measure_battery",
         "measure_power",
@@ -243,16 +313,28 @@
       ],
       "capabilitiesOptions": {
         "measure_battery": {
-          "title": { "en": "Battery SOC", "nl": "Batterijlading" }
+          "title": {
+            "en": "Battery SOC",
+            "nl": "Batterijlading"
+          }
         },
         "measure_power": {
-          "title": { "en": "Battery Power", "nl": "Batterijvermogen" }
+          "title": {
+            "en": "Battery Power",
+            "nl": "Batterijvermogen"
+          }
         },
         "meter_power.charged": {
-          "title": { "en": "Total Charged", "nl": "Totaal geladen" }
+          "title": {
+            "en": "Total Charged",
+            "nl": "Totaal geladen"
+          }
         },
         "meter_power.discharged": {
-          "title": { "en": "Total Discharged", "nl": "Totaal ontladen" }
+          "title": {
+            "en": "Total Discharged",
+            "nl": "Totaal ontladen"
+          }
         },
         "target_power": {
           "min": -3500,
@@ -264,7 +346,10 @@
         {
           "id": "target_power_timeout",
           "type": "number",
-          "label": { "en": "Target power failsafe (minutes)", "nl": "Doelvermogen failsafe (minuten)" },
+          "label": {
+            "en": "Target power failsafe (minutes)",
+            "nl": "Doelvermogen failsafe (minuten)"
+          },
           "hint": {
             "en": "When no new target power command arrives (e.g. from an EMS) within this time, the battery returns to its own self-consumption mode. 0 = disabled (default). Leave at 0 for an EMS that only sends a command when the setpoint changes, such as Ultimate EMS: otherwise the battery drops out of EMS control during a long steady setpoint.",
             "nl": "Als er binnen deze tijd geen nieuw doelvermogen-commando binnenkomt (bijv. van een EMS), gaat de accu terug naar zijn eigen zelfconsumptiemodus. 0 = uit (standaard). Laat op 0 staan bij een EMS die alleen een commando stuurt als het setpoint verandert, zoals Ultimate EMS: anders valt de accu tijdens een lang gelijk setpoint uit de EMS-aansturing."
@@ -272,7 +357,9 @@
           "value": 0,
           "min": 0,
           "max": 1440,
-          "units": { "en": "min" }
+          "units": {
+            "en": "min"
+          }
         }
       ],
       "energy": {
@@ -301,9 +388,14 @@
     },
     {
       "id": "smart-meter",
-      "name": { "en": "Smart Meter", "nl": "Slimme meter" },
+      "name": {
+        "en": "Smart Meter",
+        "nl": "Slimme meter"
+      },
       "class": "sensor",
-      "platforms": ["local", "cloud"],
+      "platforms": [
+        "local"
+      ],
       "capabilities": [
         "measure_power",
         "grid_import_power",
@@ -314,11 +406,36 @@
         "meter_power.exported_today"
       ],
       "capabilitiesOptions": {
-        "measure_power":              { "title": { "en": "Net Grid Power", "nl": "Netto netvermogen" } },
-        "meter_power.imported":       { "title": { "en": "Total Imported", "nl": "Totaal afgenomen" } },
-        "meter_power.exported":       { "title": { "en": "Total Exported", "nl": "Totaal teruggeleverd" } },
-        "meter_power.imported_today": { "title": { "en": "Imported Today", "nl": "Vandaag afgenomen" } },
-        "meter_power.exported_today": { "title": { "en": "Exported Today", "nl": "Vandaag teruggeleverd" } }
+        "measure_power": {
+          "title": {
+            "en": "Net Grid Power",
+            "nl": "Netto netvermogen"
+          }
+        },
+        "meter_power.imported": {
+          "title": {
+            "en": "Total Imported",
+            "nl": "Totaal afgenomen"
+          }
+        },
+        "meter_power.exported": {
+          "title": {
+            "en": "Total Exported",
+            "nl": "Totaal teruggeleverd"
+          }
+        },
+        "meter_power.imported_today": {
+          "title": {
+            "en": "Imported Today",
+            "nl": "Vandaag afgenomen"
+          }
+        },
+        "meter_power.exported_today": {
+          "title": {
+            "en": "Exported Today",
+            "nl": "Vandaag teruggeleverd"
+          }
+        }
       },
       "energy": {
         "cumulative": true,
@@ -335,7 +452,10 @@
           "id": "main_meter",
           "type": "checkbox",
           "value": true,
-          "label": { "en": "Use as main meter in Homey Energy", "nl": "Gebruik als hoofdmeter in Homey Energie" },
+          "label": {
+            "en": "Use as main meter in Homey Energy",
+            "nl": "Gebruik als hoofdmeter in Homey Energie"
+          },
           "hint": {
             "en": "Reports cumulative grid import/export to Homey Energy, like a HomeWizard or Pulse P1 meter. Disable when another P1 meter already fills this role, to avoid double counting.",
             "nl": "Meldt cumulatieve netafname/-teruglevering aan Homey Energie, zoals een HomeWizard- of Pulse P1-meter. Zet uit als een andere P1-meter deze rol al heeft, om dubbeltelling te voorkomen."
@@ -358,9 +478,14 @@
     },
     {
       "id": "system",
-      "name": { "en": "Power System", "nl": "Energiesysteem" },
+      "name": {
+        "en": "Power System",
+        "nl": "Energiesysteem"
+      },
       "class": "other",
-      "platforms": ["local", "cloud"],
+      "platforms": [
+        "local"
+      ],
       "capabilities": [
         "solar_power",
         "home_load_power",
@@ -372,14 +497,22 @@
       ],
       "capabilitiesOptions": {
         "measure_battery": {
-          "title": { "en": "Average Battery SOC", "nl": "Gem. batterijlading" }
+          "title": {
+            "en": "Average Battery SOC",
+            "nl": "Gem. batterijlading"
+          }
         },
         "measure_power": {
-          "title": { "en": "Net Grid Power", "nl": "Netto netvermogen" }
+          "title": {
+            "en": "Net Grid Power",
+            "nl": "Netto netvermogen"
+          }
         }
       },
       "energy": {
-        "batteries": ["INTERNAL"]
+        "batteries": [
+          "INTERNAL"
+        ]
       },
       "images": {
         "small": "/drivers/system/assets/images/small.png",
@@ -405,75 +538,215 @@
     "triggers": [
       {
         "id": "solarbank_charging_started",
-        "title": { "en": "Battery started charging", "nl": "Batterij is begonnen met opladen" },
-        "args": [{ "name": "device", "type": "device", "filter": "driver_id=solarbank" }]
+        "title": {
+          "en": "Battery started charging",
+          "nl": "Batterij is begonnen met opladen"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=solarbank"
+          }
+        ]
       },
       {
         "id": "solarbank_charging_stopped",
-        "title": { "en": "Battery stopped charging", "nl": "Batterij is gestopt met opladen" },
-        "args": [{ "name": "device", "type": "device", "filter": "driver_id=solarbank" }]
+        "title": {
+          "en": "Battery stopped charging",
+          "nl": "Batterij is gestopt met opladen"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=solarbank"
+          }
+        ]
       },
       {
         "id": "solarbank_discharging_started",
-        "title": { "en": "Battery started discharging", "nl": "Batterij is begonnen met ontladen" },
-        "args": [{ "name": "device", "type": "device", "filter": "driver_id=solarbank" }]
+        "title": {
+          "en": "Battery started discharging",
+          "nl": "Batterij is begonnen met ontladen"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=solarbank"
+          }
+        ]
       },
       {
         "id": "grid_import_started",
-        "title": { "en": "Grid import started", "nl": "Nettimport gestart" },
-        "args": [{ "name": "device", "type": "device", "filter": "driver_id=smart-meter" }]
+        "title": {
+          "en": "Grid import started",
+          "nl": "Nettimport gestart"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=smart-meter"
+          }
+        ]
       },
       {
         "id": "grid_export_started",
-        "title": { "en": "Grid export started", "nl": "Netexport gestart" },
-        "args": [{ "name": "device", "type": "device", "filter": "driver_id=smart-meter" }]
+        "title": {
+          "en": "Grid export started",
+          "nl": "Netexport gestart"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=smart-meter"
+          }
+        ]
       }
     ],
     "conditions": [
       {
         "id": "battery_soc_above",
-        "title": { "en": "Battery SOC !{{is|is not}} above {{soc}}%", "nl": "Batterijlading !{{is|is niet}} boven {{soc}}%" },
-        "titleFormatted": { "en": "Battery SOC !{{is|is not}} above [[soc]]%", "nl": "Batterijlading !{{is|is niet}} boven [[soc]]%" },
+        "title": {
+          "en": "Battery SOC !{{is|is not}} above {{soc}}%",
+          "nl": "Batterijlading !{{is|is niet}} boven {{soc}}%"
+        },
+        "titleFormatted": {
+          "en": "Battery SOC !{{is|is not}} above [[soc]]%",
+          "nl": "Batterijlading !{{is|is niet}} boven [[soc]]%"
+        },
         "args": [
-          { "name": "device", "type": "device", "filter": "driver_id=solarbank" },
-          { "name": "soc", "type": "number", "min": 0, "max": 100, "step": 5, "placeholder": { "en": "50", "nl": "50" } }
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=solarbank"
+          },
+          {
+            "name": "soc",
+            "type": "number",
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "placeholder": {
+              "en": "50",
+              "nl": "50"
+            }
+          }
         ]
       },
       {
         "id": "solar_power_above",
-        "title": { "en": "Solar power !{{is|is not}} above {{watts}}W", "nl": "Zonnestroom !{{is|is niet}} boven {{watts}}W" },
-        "titleFormatted": { "en": "Solar power !{{is|is not}} above [[watts]]W", "nl": "Zonnestroom !{{is|is niet}} boven [[watts]]W" },
+        "title": {
+          "en": "Solar power !{{is|is not}} above {{watts}}W",
+          "nl": "Zonnestroom !{{is|is niet}} boven {{watts}}W"
+        },
+        "titleFormatted": {
+          "en": "Solar power !{{is|is not}} above [[watts]]W",
+          "nl": "Zonnestroom !{{is|is niet}} boven [[watts]]W"
+        },
         "args": [
-          { "name": "device", "type": "device", "filter": "driver_id=solarbank|driver_id=system" },
-          { "name": "watts", "type": "number", "min": 0, "max": 20000, "step": 10, "placeholder": { "en": "500", "nl": "500" } }
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=solarbank|driver_id=system"
+          },
+          {
+            "name": "watts",
+            "type": "number",
+            "min": 0,
+            "max": 20000,
+            "step": 10,
+            "placeholder": {
+              "en": "500",
+              "nl": "500"
+            }
+          }
         ]
       },
       {
         "id": "grid_importing",
-        "title": { "en": "Grid !{{is|is not}} importing power", "nl": "Net !{{importeert|importeert niet}} stroom" },
-        "args": [{ "name": "device", "type": "device", "filter": "driver_id=smart-meter|driver_id=system" }]
+        "title": {
+          "en": "Grid !{{is|is not}} importing power",
+          "nl": "Net !{{importeert|importeert niet}} stroom"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=smart-meter|driver_id=system"
+          }
+        ]
       }
     ],
     "actions": [
       {
         "id": "set_output_preset",
-        "title": { "en": "Set output power target", "nl": "Stel uitgangsvermogen in" },
-        "titleFormatted": { "en": "Set output power target to [[watts]]W", "nl": "Stel uitgangsvermogen in op [[watts]]W" },
+        "title": {
+          "en": "Set output power target",
+          "nl": "Stel uitgangsvermogen in"
+        },
+        "titleFormatted": {
+          "en": "Set output power target to [[watts]]W",
+          "nl": "Stel uitgangsvermogen in op [[watts]]W"
+        },
         "args": [
-          { "name": "device", "type": "device", "filter": "driver_id=solarbank" },
-          { "name": "watts", "type": "number", "min": 0, "max": 1800, "step": 10, "placeholder": { "en": "100", "nl": "100" } }
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=solarbank"
+          },
+          {
+            "name": "watts",
+            "type": "number",
+            "min": 0,
+            "max": 1800,
+            "step": 10,
+            "placeholder": {
+              "en": "100",
+              "nl": "100"
+            }
+          }
         ]
       },
       {
         "id": "set_grid_export",
-        "title": { "en": "Set grid export", "nl": "Stel netexport in" },
-        "titleFormatted": { "en": "Set grid export to [[enabled]]", "nl": "Stel netexport in op [[enabled]]" },
+        "title": {
+          "en": "Set grid export",
+          "nl": "Stel netexport in"
+        },
+        "titleFormatted": {
+          "en": "Set grid export to [[enabled]]",
+          "nl": "Stel netexport in op [[enabled]]"
+        },
         "args": [
-          { "name": "device", "type": "device", "filter": "driver_id=solarbank" },
-          { "name": "enabled", "type": "dropdown", "values": [
-            { "id": "true", "label": { "en": "Enabled", "nl": "Ingeschakeld" } },
-            { "id": "false", "label": { "en": "Disabled", "nl": "Uitgeschakeld" } }
-          ]}
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=solarbank"
+          },
+          {
+            "name": "enabled",
+            "type": "dropdown",
+            "values": [
+              {
+                "id": "true",
+                "label": {
+                  "en": "Enabled",
+                  "nl": "Ingeschakeld"
+                }
+              },
+              {
+                "id": "false",
+                "label": {
+                  "en": "Disabled",
+                  "nl": "Uitgeschakeld"
+                }
+              }
+            ]
+          }
         ]
       }
     ]
