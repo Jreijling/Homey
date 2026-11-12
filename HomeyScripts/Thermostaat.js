@@ -24,7 +24,7 @@
 const THERMOSTAAT_ID = '295b3cbb-2cc4-4e4d-9996-294cdf6b2cd0';
 const P1_APPARAAT_ID = '3755a652-027b-41bb-b188-ab2ac592ee04';
 const DYNAMISCHE_ENERGIE_PRIJS_ID = 'adc99ffc-add2-40d0-b664-8ce3b19c28af'; // Power by the Hour: NL_Netherlands (Frank Energie opslag)
-const ACCU_APPARAAT_ID = 'd0b80416-826c-4db9-9a4e-163796f60d5a'; // Solarbank ("Accu")
+const ACCU_APPARAAT_ID = '46654c7d-d07d-4c4e-8db2-0ec0f1a2c825'; // Accu (Anker Solix community-app)
 
 // ---------- Accu ----------
 // Onder deze laadtoestand gaat zonnestroom eerst naar de Accu, daarboven

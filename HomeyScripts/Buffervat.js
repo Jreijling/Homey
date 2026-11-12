@@ -26,7 +26,7 @@
 const P1_APPARAAT_ID = '3755a652-027b-41bb-b188-ab2ac592ee04';
 const WARMTEPOMP_ID = 'd9a883d7-6322-4b73-820d-cd259bde862c';
 const DYNAMISCHE_ENERGIE_PRIJS_ID = 'adc99ffc-add2-40d0-b664-8ce3b19c28af'; // Power by the Hour: NL_Netherlands (Frank Energie opslag)
-const ACCU_APPARAAT_ID = 'd0b80416-826c-4db9-9a4e-163796f60d5a'; // Solarbank ("Accu")
+const ACCU_APPARAAT_ID = '46654c7d-d07d-4c4e-8db2-0ec0f1a2c825'; // Accu (Anker Solix community-app)
 const ZON_FORECAST_APPARAAT_ID = '865bc38a-e913-4771-aec7-b6bc7ab46b6a'; // Zonnepanelen_Σsolar (Power by the Hour) — "Prognose deze dag"
 
 // ---------- Instellingen warmtepomp doeltemperaturen ----------
