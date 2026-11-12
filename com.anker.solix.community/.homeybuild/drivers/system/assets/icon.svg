@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <polygon points="12,48 50,16 88,48" fill="#1a237e"/>
+  <g transform="rotate(-24 39 42)">
+    <rect x="24" y="34" width="30" height="16" rx="1" fill="#0d1642"/>
+    <line x1="34" y1="34" x2="34" y2="50" stroke="#3949ab" stroke-width="1.5"/>
+    <line x1="44" y1="34" x2="44" y2="50" stroke="#3949ab" stroke-width="1.5"/>
+    <line x1="24" y1="42" x2="54" y2="42" stroke="#3949ab" stroke-width="1.5"/>
+  </g>
+  <rect x="18" y="48" width="64" height="34" fill="#37474f"/>
+  <rect x="24" y="56" width="10" height="10" rx="1" fill="#90caf9"/>
+  <rect x="66" y="56" width="10" height="10" rx="1" fill="#90caf9"/>
+  <rect x="45" y="64" width="10" height="18" rx="1" fill="#263238"/>
+  <rect x="80" y="64" width="14" height="22" rx="2" fill="#1a237e"/>
+  <rect x="82.5" y="75" width="9" height="8" rx="1" fill="#00acc1"/>
+</svg>
