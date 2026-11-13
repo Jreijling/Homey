@@ -344,6 +344,19 @@
       },
       "settings": [
         {
+          "id": "follow_target_power",
+          "type": "checkbox",
+          "label": {
+            "en": "Follow target power from other apps",
+            "nl": "Doelvermogen van andere apps volgen"
+          },
+          "hint": {
+            "en": "When off, target power commands from Homey Energy or an EMS app (such as Ultimate EMS) are ignored and the battery stays in its own self-consumption mode (zero on the meter). Grid charge power and battery hold, from the device or from flows, keep working.",
+            "nl": "Als dit uit staat, worden doelvermogen-commando's van Homey Energie of een EMS-app (zoals Ultimate EMS) genegeerd en blijft de accu in zijn eigen zelfconsumptiemodus (0 op de meter). Netlaadvermogen en Accu vasthouden, vanaf het apparaat of uit flows, blijven werken."
+          },
+          "value": true
+        },
+        {
           "id": "target_power_timeout",
           "type": "number",
           "label": {
