@@ -56,7 +56,12 @@ class SolarbankDevice extends Homey.Device {
     if (this._getCap('target_power_mode') == null) {
       this._set('target_power_mode', 'device');
     } else if (this._getCap('target_power_mode') === 'homey') {
-      this._armTargetPowerWatchdog();
+      if (this._followsTargetPower()) {
+        this._armTargetPowerWatchdog();
+      } else {
+        this._returnToSelfConsumption('following target power is turned off')
+          .catch(err => this.error('Return to self-consumption failed:', err.message));
+      }
     }
 
     // Subscribe to poll results
@@ -298,6 +303,16 @@ class SolarbankDevice extends Homey.Device {
    */
   async setTargetPower(watts) {
     const w = Math.round(watts);
+    if (!this._followsTargetPower()) {
+      // Resolve instead of throwing, so an EMS doesn't log an error every few
+      // seconds. Homey stores the requested value after the listener resolves;
+      // put the previous one back so the device doesn't show a setpoint it
+      // isn't following.
+      const previous = this._getCap('target_power');
+      this.log(`target_power: ${w} W ignored (following target power is turned off)`);
+      this.homey.setTimeout(() => this._set('target_power', previous), 0);
+      return;
+    }
     this.log(`target_power: ${w} W`);
     await setBatteryPower({ ...this._modbusTarget(), watts: w });
 
@@ -309,8 +324,15 @@ class SolarbankDevice extends Homey.Device {
     this._armTargetPowerWatchdog();
   }
 
+  _followsTargetPower() {
+    return this.getSetting('follow_target_power') !== false;
+  }
+
   async setTargetPowerMode(mode) {
     if (mode === 'homey') {
+      if (!this._followsTargetPower()) {
+        throw new Error('Following target power is turned off in the device settings');
+      }
       let w = this._getCap('target_power');
       if (!Number.isFinite(w)) w = 0;
       await this.setTargetPower(w);
@@ -373,7 +395,13 @@ class SolarbankDevice extends Homey.Device {
     this.homey.clearTimeout(this._targetPowerWatchdog);
   }
 
-  async onSettings({ changedKeys }) {
+  async onSettings({ newSettings, changedKeys }) {
+    // Turning off "follow target power" hands the battery straight back to
+    // its own self-consumption mode (zero on the meter).
+    if (changedKeys.includes('follow_target_power') && newSettings.follow_target_power === false
+      && this._getCap('target_power_mode') === 'homey') {
+      await this._returnToSelfConsumption('following target power was turned off');
+    }
     // Settings are stored after onSettings resolves, so re-arm on the next tick
     // to pick up a new failsafe timeout while Homey is in control.
     if (changedKeys.includes('target_power_timeout') && this._getCap('target_power_mode') === 'homey') {
